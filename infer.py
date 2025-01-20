@@ -81,6 +81,8 @@ def inference(model_conf):
         model_name_list = [f'epoch_{i}.pth' for i in range(20)]
     else:
         assert False, 'predict_mode must be only_best or all'
+        
+    assert os.path.exists(model_conf.ckpt_dir), f'Model checkpoints dir not found: {model_conf.ckpt_dir}'
     
     for model_name in tqdm(model_name_list):
         ckpt_path = os.path.join(model_conf.ckpt_dir, model_name)
