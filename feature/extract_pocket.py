@@ -465,6 +465,8 @@ def get_res_ids(pdb_file):
 
 
 def get_pocket_info_batch_new(input_dir, save_path):
+    print('Generating pocket residues information...')
+    
     # Get a list of all PDB files in the input directory
     pdb_files = glob.glob(os.path.join(input_dir, "*.pdb"))
 
