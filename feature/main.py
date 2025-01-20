@@ -14,11 +14,11 @@ import numpy as np
 from tqdm import tqdm
 import torch
 import esm
-from Bio.PDB import PDBParser
+from Bio import PDB
 
 from utils import check_dir, cano_rxn, tranverse_folder
 from gvp_torchdrug_feature import calc_gvp_feature
-from extract_pocket import get_pocket_info, extract_fix_num_residues
+from extract_pocket import get_pocket_info, extract_fix_num_residues, get_pocket_info_batch_new
 from extract_reacting_center import extract_reacting_center, calc_aam
 
 
@@ -404,6 +404,9 @@ def main():
     if not args.pocket_dir:
         # Note: make sure the result file of alphafill ends with '_transplant.cif'
         get_pocket_info_batch(alphafill_result_dir, pocket_info_save_path, pocket_dir)
+    else:
+        if not os.path.exists(pocket_info_save_path):
+            get_pocket_info_batch_new(args.pocket_dir, pocket_info_save_path)
     
     # Calculate GVP features of pockets
     calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)

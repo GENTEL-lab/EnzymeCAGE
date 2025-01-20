@@ -10,6 +10,7 @@ from Bio.PDB import MMCIFParser, PDBParser, PDBIO, NeighborSearch, MMCIFIO
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
+import glob
 
 
 POCKET_RADIUS = 8.0
@@ -208,7 +209,7 @@ def filter_ligands(structure, all_ligands=False, remove_ion=False):
             model.detach_child(chain_id)
         
     return structure
-            
+
 
 def get_pocket_info(input_path, pocket_save_dir=None):
     try:
@@ -446,3 +447,37 @@ def extract_pocket_by_resids(input_dir, save_dir, pocket_info_path):
         io.save(save_path, PocketSelect(pocket_residues))
         
         # print(f'Pocket residues for {uid} saved to {save_path}')
+        
+        
+def get_res_ids(pdb_file):
+    parser = PDB.PDBParser(QUIET=True)    
+    structure = parser.get_structure("protein", pdb_file)
+    
+    residue_id_list = []
+
+    residues = [res for res in structure.get_residues()]
+    
+    for residue in residues:
+        residue_id = residue.get_id()[1] 
+        residue_id_list.append(str(residue_id))
+    
+    return residue_id_list
+
+
+def get_pocket_info_batch_new(input_dir, save_path):
+    # Get a list of all PDB files in the input directory
+    pdb_files = glob.glob(os.path.join(input_dir, "*.pdb"))
+
+    # Initialize a list to store the pocket information for each PDB file
+    pocket_info_list = []
+    uid_list = []
+
+    with Pool(20) as pool:
+        for pocket_info in tqdm(pool.imap(get_res_ids, pdb_files), total=len(pdb_files)):
+            pocket_info_list.append(','.join(pocket_info))
+    
+    uid_list = [os.path.basename(pdb_file).split('.')[0] for pdb_file in pdb_files]
+
+    df_pocket_info = pd.DataFrame({'uniprotID': uid_list, 'pocket_residues': pocket_info_list})
+    df_pocket_info.to_csv(save_path, index=False)
+    print(f'\nSave pocket info to {save_path}\n')
