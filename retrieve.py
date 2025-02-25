@@ -130,7 +130,7 @@ def get_mol_simi_dict(test_rxns, all_cand_rxns):
     return cpd_simi_dict, cand_mol_to_id_dict
 
 
-def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk=10):
+def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk=10, exclude_rxns=set()):
     """To retrieve candidate enzymes for each reaction in the df_data.
 
     Args:
@@ -146,7 +146,7 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
     """
         
     rxns_to_retrieve = {rxn for rxn in set(df_data[smiles_col]) if isinstance(rxn, str)}
-    all_cand_rxns = set(df_db[smiles_col]) - rxns_to_retrieve
+    all_cand_rxns = set(df_db[smiles_col]) - exclude_rxns - rxns_to_retrieve
     
     UID_TO_SEQ, RXN_TO_UID = init_mapping_info(df_db)
     cpd_simi_dict, cand_mol_to_id_dict = get_mol_simi_dict(rxns_to_retrieve, all_cand_rxns)
@@ -197,6 +197,7 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, required=True)
+    parser.add_argument('--exclude_rxns', type=str, default='./dataset/orphan-rxns/rxns_exclude_in_retrieval.csv')
     parser.add_argument('--db_path', type=str, default='./dataset/db/enzyme-reaction-pairs.csv')
     parser.add_argument('--smiles_col', type=str, default='CANO_RXN_SMILES', help='column name of reaction SMILES in the data')
     parser.add_argument('--proevi_path', type=str, default='./dataset/others/uid_to_proevi.pkl')
@@ -208,12 +209,19 @@ def main():
     assert os.path.exists(args.data_path), f'{args.data_path} does not exist!'
     assert os.path.exists(args.db_path), f'{args.db_path} does not exist!'
     
+    if os.path.exists(args.exclude_rxns):
+        df_exclude_rxns = pd.read_csv(args.exclude_rxns)
+        exclude_rxns = set(df_exclude_rxns[args.smiles_col])
+        print(f'Load {len(exclude_rxns)} rxns to exclude')
+    else:
+        exclude_rxns = {}
+    
     df_data = pd.read_csv(args.data_path)
     df_db = pd.read_csv(args.db_path)
     uid_to_proevi = pkl.load(open(args.proevi_path, 'rb'))
     uid_to_taxdis = pkl.load(open(args.taxdis_path, 'rb'))
     
-    df_retrievel_cands = run_retrieval(df_data, df_db, args.smiles_col, uid_to_proevi, uid_to_taxdis)
+    df_retrievel_cands = run_retrieval(df_data, df_db, args.smiles_col, uid_to_proevi, uid_to_taxdis, exclude_rxns=exclude_rxns)
     df_retrievel_cands.to_csv(save_path, index=False)
     
     print(f'Retrieved candidates saved to: {save_path}')
