@@ -17,10 +17,12 @@ from utils import get_rdkit_mol
 def init_mapping_info(df_pos_pairs):
     if 'Label' in df_pos_pairs.columns:
         df_pos_pairs = df_pos_pairs[df_pos_pairs['Label'] == 1]
+    
+    uid_col = 'uniprotID' if 'uniprotID' in df_pos_pairs.columns else 'UniprotID'
         
     uid_to_seq = {}
     rxn_to_uid = defaultdict(set)
-    for rxn, uid, seq in df_pos_pairs[['CANO_RXN_SMILES', 'uniprotID', 'sequence']].values:
+    for rxn, uid, seq in df_pos_pairs[['CANO_RXN_SMILES', uid_col, 'sequence']].values:
         uid_to_seq[uid] = seq
         rxn_to_uid[rxn].add(uid) 
     return uid_to_seq, rxn_to_uid
@@ -109,6 +111,7 @@ def get_mol_simi_dict(test_rxns, all_cand_rxns):
     testset_smiles_list = []
     for rxn in test_rxns:
         smiles_list = rxn.split('>>')[0].split('.') + rxn.split('>>')[1].split('.')
+        smiles_list = [smi for smi in smiles_list]
         testset_smiles_list.extend(smiles_list)
     test_smiles = list(set(testset_smiles_list))
 
@@ -120,7 +123,19 @@ def get_mol_simi_dict(test_rxns, all_cand_rxns):
 
     cand_mol_ids = [f'MOL_{i}' for i, _ in enumerate(cand_smiles)]
     cand_mol_to_id_dict = dict(zip(cand_smiles, cand_mol_ids))
-    cand_fp_list = [get_morgan_fp(neutralize_atoms(smi))[0] for smi in tqdm(cand_smiles, desc='Calculating morgan fps')]
+    cand_fp_list = []
+    for smi in tqdm(cand_smiles):
+        try:
+            smi = neutralize_atoms(smi)
+        except:
+            print(f'Cannot neutralize SMILES: {smi}, use original format')
+
+        try:
+            fp = get_morgan_fp(smi)[0]
+            cand_fp_list.append(fp)
+        except:
+            print(f'Error SMILES: ', smi)
+            print(sss)
 
     cpd_simi_dict = {}
     for smi in tqdm(test_smiles):
@@ -166,9 +181,14 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
             S1, S2, _ = getRSim(rcts_smi_counter, pros_smi_counter, cand_rcts_molid_counter, cand_pros_molid_counter, cpd_simi_dict)
             max_simi = max(S1, S2)
             rxn_simi_list.append(max_simi)
-        cand_rxn_info = [each for each in list(zip(all_cand_rxns, rxn_simi_list)) if each[1] != 1]
+        cand_rxn_info = [each for each in list(zip(all_cand_rxns, rxn_simi_list))]
         cand_rxn_info = sorted(cand_rxn_info, key=lambda x: x[1], reverse=True)[:topk]
         similar_rxns_map[rxn_target] = cand_rxn_info
+    
+    import pickle as pkl
+    with open('similar_rxns_map.pkl', 'wb') as f:
+        pkl.dump(similar_rxns_map, f)
+        print(sss)
 
     result_list = []
     for rxn, similar_rxns in tqdm(similar_rxns_map.items(), desc='Calculating scores'):
@@ -209,12 +229,12 @@ def main():
     assert os.path.exists(args.data_path), f'{args.data_path} does not exist!'
     assert os.path.exists(args.db_path), f'{args.db_path} does not exist!'
     
-    if os.path.exists(args.exclude_rxns):
+    if args.exclude_rxns and os.path.exists(args.exclude_rxns):
         df_exclude_rxns = pd.read_csv(args.exclude_rxns)
         exclude_rxns = set(df_exclude_rxns[args.smiles_col])
         print(f'Load {len(exclude_rxns)} rxns to exclude')
     else:
-        exclude_rxns = {}
+        exclude_rxns = set()
     
     df_data = pd.read_csv(args.data_path)
     df_db = pd.read_csv(args.db_path)
