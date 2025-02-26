@@ -134,6 +134,9 @@ python evaluate.py --result_path checkpoints/orphan-rxns/seed_42/orphan_reaction
 python evaluate.py --result_path checkpoints/unseen-enzymes/seed_42/test_result.csv
 ```
 
+## License
+No commercial use of the model or data; see LICENSE for details.
+
 ## Citation
 Please cite the following preprint when referencing EnzymeCAGE:
 ```
