@@ -8,6 +8,11 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import PatternFingerprint
 
 
+UID_COL = 'UniprotID'
+SEQ_COL = 'sequence'
+RXN_COL = 'CANO_RXN_SMILES'
+
+
 def tranverse_folder(folder):
     all_files = []
     for root, dirs, files in os.walk(folder):

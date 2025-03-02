@@ -16,7 +16,7 @@ import torch
 import esm
 from Bio import PDB
 
-from utils import check_dir, cano_rxn, tranverse_folder
+from utils import check_dir, cano_rxn, tranverse_folder, RXN_COL, UID_COL, SEQ_COL
 from gvp_torchdrug_feature import calc_gvp_feature
 from extract_pocket import get_pocket_info, extract_fix_num_residues, get_pocket_info_batch_new
 from extract_reacting_center import extract_reacting_center, calc_aam
@@ -25,7 +25,7 @@ from extract_reacting_center import extract_reacting_center, calc_aam
 def calc_morgan_fp(data_path, save_path, append=True):
     print('\n', '#' * 20, 'Calculating morgan fp', '#' * 20, '\n')
     df_data = pd.read_csv(data_path)
-    rxn_list = list(set(df_data['CANO_RXN_SMILES']))
+    rxn_list = list(set(df_data[RXN_COL]))
 
     if os.path.exists(save_path) and append:
         rxn_to_fp = pkl.load(open(save_path, 'rb'))
@@ -52,7 +52,7 @@ def calc_drfp(data_path, save_path, append=True):
     from drfp import DrfpEncoder
 
     df_data = pd.read_csv(data_path)
-    rxn_list = list(set(df_data['CANO_RXN_SMILES']))
+    rxn_list = list(set(df_data[RXN_COL]))
 
     if os.path.exists(save_path) and append:
         rxn_to_fp = pkl.load(open(save_path, 'rb'))
@@ -85,6 +85,89 @@ def batch_generator(sequence_list, batch_size):
         yield sequence_list[i:i + batch_size]
 
 
+def calc_seq_esm_C_feature(data_path, esm_node_feat_dir, esm_mean_feat_path):
+    print('\n', '#' * 20, 'Calculating ESM-C feature', '#' * 20, '\n')
+    
+    from esm.models.esmc import ESMC
+    from esm.sdk.api import ESMProtein, LogitsConfig
+    
+    # Load ESM-C model
+    device = 'cuda'
+    model = ESMC.from_pretrained("esmc_600m").to(device) # or "cpu"
+    
+    df_data = pd.read_csv(data_path)
+    uid_to_seq = dict(zip(df_data[UID_COL], df_data[SEQ_COL]))
+    os.makedirs(esm_node_feat_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(esm_mean_feat_path), exist_ok=True)
+
+    # To ensure the order
+    df_data = df_data.drop_duplicates(UID_COL)
+
+    uid_list = []
+    for uid in df_data[UID_COL].tolist():
+        seq = uid_to_seq.get(uid)
+        save_path = os.path.join(esm_node_feat_dir, f'{uid}.npz')
+
+        # skip if already exists
+        if os.path.exists(save_path):
+            continue
+        uid_list.append(uid)
+    print(f"\n{len(uid_list)} proteins to calculate features...")
+
+    cnt_fail = 0
+    cnt_all = 0
+    failed_seqs = []
+    failed_uids = []
+    
+    if os.path.exists(esm_mean_feat_path):
+        seq_to_feature = pkl.load(open(esm_mean_feat_path, 'rb'))
+    else:
+        seq_to_feature = {}
+
+    for uid in tqdm(uid_list):
+        seq = uid_to_seq.get(uid)
+
+        save_path = os.path.join(esm_node_feat_dir, f'{uid}.npz')
+        if os.path.exists(save_path):
+            continue
+        
+        protein = ESMProtein(sequence=seq)
+
+        # Extract per-residue representations
+        try:
+            with torch.no_grad():
+                protein_tensor = model.encode(protein)
+                logits_output = model.logits(
+                    protein_tensor, LogitsConfig(sequence=True, return_embeddings=True)
+                )
+        except Exception as e:
+            print(f'sequence length: {len(seq)}')
+            print(e)
+            cnt_fail += 1
+            failed_seqs.append(seq)
+            failed_uids.append(uid)
+            continue
+        
+        # dim: (n,1152)
+        node_feature = logits_output.embeddings[0].cpu()
+        
+        np.savez_compressed(save_path, node_feature=node_feature)
+        
+        seq_to_feature[seq] = node_feature.mean(axis=0)
+        
+        cnt_all += 1    
+    
+    with open(esm_mean_feat_path, 'wb') as f:
+        pkl.dump(seq_to_feature, f)
+
+    print(f'\ncnt_fail: {cnt_fail}')
+    df_failed = pd.DataFrame({UID_COL: failed_uids, SEQ_COL: failed_seqs})
+    failed_save_path = os.path.join(esm_node_feat_dir, 'failed_proteins.csv')
+    df_failed.to_csv(failed_save_path, index=False)
+    print(f'Save failed proteins to {failed_save_path}')
+    
+    
+
 def calc_seq_esm_feature(data_path, esm_node_feat_dir, esm_mean_feat_path):
     print('\n', '#' * 20, 'Calculating ESM feature', '#' * 20, '\n')
     # Load ESM-2 model
@@ -97,15 +180,15 @@ def calc_seq_esm_feature(data_path, esm_node_feat_dir, esm_mean_feat_path):
     print('Molel loading done!')
 
     df_data = pd.read_csv(data_path)
-    uid_to_seq = dict(zip(df_data['uniprotID'], df_data['sequence']))
+    uid_to_seq = dict(zip(df_data[UID_COL], df_data[SEQ_COL]))
     os.makedirs(esm_node_feat_dir, exist_ok=True)
     os.makedirs(os.path.dirname(esm_mean_feat_path), exist_ok=True)
 
     # To ensure the order
-    df_data = df_data.drop_duplicates('uniprotID')
+    df_data = df_data.drop_duplicates(UID_COL)
 
     uid_list = []
-    for uid in df_data['uniprotID'].tolist():
+    for uid in df_data[UID_COL].tolist():
         seq = uid_to_seq.get(uid)
         save_path = os.path.join(esm_node_feat_dir, f'{uid}.npz')
 
@@ -167,7 +250,7 @@ def calc_seq_esm_feature(data_path, esm_node_feat_dir, esm_mean_feat_path):
         pkl.dump(seq_to_feature, f)
 
     print(f'\ncnt_fail: {cnt_fail}')
-    df_failed = pd.DataFrame({'uniprotID': failed_uids, 'sequence': failed_seqs})
+    df_failed = pd.DataFrame({UID_COL: failed_uids, SEQ_COL: failed_seqs})
     failed_save_path = os.path.join(esm_node_feat_dir, 'failed_proteins.csv')
     df_failed.to_csv(failed_save_path, index=False)
     print(f'Save failed proteins to {failed_save_path}')
@@ -205,7 +288,7 @@ def generate_rdkit_conformation_v2(smiles, n_repeat=50):
 def generate_mol_conformation(data_path, save_dir):
     print('\n', '#' * 20, 'Generating Mol Conformation', '#' * 20, '\n')
     df_data = pd.read_csv(data_path)
-    rxns = set(df_data['CANO_RXN_SMILES'])
+    rxns = set(df_data[RXN_COL])
     
     all_smiles_list = []
     for rxn in rxns:
@@ -241,7 +324,7 @@ def get_pocket_info_batch(input_dir, save_path, pocket_save_dir=None, max_residu
     with Pool(20) as pool:
         for res in tqdm(pool.imap(running_func, filelist), total=len(filelist)):
             pocket_info_list.append(res)
-    df_pocket_info = pd.DataFrame({'uniprotID': uid_list, 'pocket_residues': pocket_info_list})
+    df_pocket_info = pd.DataFrame({UID_COL: uid_list, 'pocket_residues': pocket_info_list})
     df_pocket_info.to_csv(save_path, index=False)
     print(f'\nSave pocket info to {save_path}\n')
     
@@ -250,7 +333,7 @@ def get_pocket_info_batch(input_dir, save_path, pocket_save_dir=None, max_residu
 
 def get_esm_pocket_feature(pocket_info_path, esm_node_feat_dir, save_path):
     df_pocket_data = pd.read_csv(pocket_info_path)
-    uid_to_pocket = dict(zip(df_pocket_data['uniprotID'], df_pocket_data['pocket_residues']))
+    uid_to_pocket = dict(zip(df_pocket_data[UID_COL], df_pocket_data['pocket_residues']))
     esm_file_list = [each for each in tranverse_folder(esm_node_feat_dir) if each.endswith('.npz')]
     
     uid_to_pocket_node_feature = {}
@@ -295,7 +378,7 @@ def check_pocket_feature(gvp_feature_path, esm_feature_path, log_dir=None):
         if n_gvp_nodes != n_esm_nodes:
             bad_proteins.append(uid)
     
-    df_bad_pros = pd.DataFrame({'uniprotID': bad_proteins})
+    df_bad_pros = pd.DataFrame({UID_COL: bad_proteins})
     
     if len(df_bad_pros) > 0 and log_dir:
         print(f"Found {len(df_bad_pros)} bad proteins, which have different node numbers between gvp and esm features. These proteins should be removed from training data!")
@@ -326,7 +409,7 @@ def calc_reacting_center(data_path, save_dir, append=True):
         cached_reacting_center_map = {}
     
     df_data = pd.read_csv(data_path)
-    rxns_to_run = df_data['CANO_RXN_SMILES'].unique()
+    rxns_to_run = df_data[RXN_COL].unique()
     rxns_to_run = [rxn for rxn in rxns_to_run if rxn not in cached_reacting_center_map]
     reacting_center_map = {}
     for rxn in tqdm(rxns_to_run):
@@ -362,10 +445,13 @@ def main():
         
     feature_dir = os.path.join(os.path.dirname(args.data_path), 'feature')
     
+    # esm_model = 'esm2_t33_650M_UR50D'
+    esm_model = 'ESM-C_600M'
+    
     protein_feature_dir = os.path.join(feature_dir, 'protein')
-    esm_node_feat_dir = os.path.join(protein_feature_dir, 'esm2_t33_650M_UR50D/node_level')
-    esm_mean_feat_path = os.path.join(protein_feature_dir, 'esm2_t33_650M_UR50D/protein_level/seq2feature.pkl')
-    esm_pocket_node_feature_path = os.path.join(protein_feature_dir, 'esm2_t33_650M_UR50D/pocket_node_feature/esm_node_feature.pt')
+    esm_node_feat_dir = os.path.join(protein_feature_dir, f'{esm_model}/node_level')
+    esm_mean_feat_path = os.path.join(protein_feature_dir, f'{esm_model}/protein_level/seq2feature.pkl')
+    esm_pocket_node_feature_path = os.path.join(protein_feature_dir, f'{esm_model}/pocket_node_feature/esm_node_feature.pt')
     gvp_feat_path = os.path.join(protein_feature_dir, 'gvp_feature/gvp_protein_feature.pt')
     pocket_info_save_path = os.path.join(os.path.dirname(pocket_dir), 'pocket_info.csv')
     
@@ -389,16 +475,12 @@ def main():
     calc_morgan_fp(args.data_path, morgan_save_path)
     calc_drfp(args.data_path, drfp_save_path)
     
-    # Extract reaction center
-    calc_reacting_center(args.data_path, reacting_center_dir)
-    
-    if not args.skip_calc_mol_conformation:
-        # May be the most time consuming step
-        # Generate molecular conformation by rdkit
-        generate_mol_conformation(args.data_path, mol_conformation_dir)
-    
     # Calculate ESM features of the full sequence
-    calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
+    if esm_model == 'esm2_t33_650M_UR50D':
+        calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
+    elif esm_model == 'ESM-C_600M':
+        calc_seq_esm_C_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
+    
     
     # Extract pocket information if you don't specify the pocket directory
     if not args.pocket_dir:
@@ -416,6 +498,14 @@ def main():
     
     # Make sure the number of nodes of pocket is the same between GVP and ESM feature
     check_pocket_feature(gvp_feat_path, esm_pocket_node_feature_path, log_dir=os.path.dirname(args.data_path))
+    
+    # Extract reaction center
+    calc_reacting_center(args.data_path, reacting_center_dir)
+    
+    if not args.skip_calc_mol_conformation:
+        # May be the most time consuming step
+        # Generate molecular conformation by rdkit
+        generate_mol_conformation(args.data_path, mol_conformation_dir)
     
     print('\n ###### Feature calculation is finished! ######\n')
     

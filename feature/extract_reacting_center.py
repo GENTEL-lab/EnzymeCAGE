@@ -335,3 +335,9 @@ def extract_reacting_center(rxn, rxn2aam):
     reaction_center = [center_rcts, center_prods]
     
     return reaction_center
+
+
+if __name__=='__main__':
+    data_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/tsv/rhea_rxn2uids.csv'
+    save_dir = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed'
+    calc_aam(data_path, save_dir)

@@ -12,14 +12,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 model_dir = os.path.join(ROOT_DIR, 'enzymecage')
 sys.path.append(model_dir)
 from gvp.data import ProteinGraphDataset
-
-
-def tranverse_folder(folder):
-    all_files = []
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            all_files.append(os.path.join(root, file))
-    return all_files
+from utils import UID_COL
 
 
 three_to_one = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 
@@ -90,7 +83,7 @@ def calc_gvp_feature(data_path, pdb_dir, save_path):
     os.makedirs(protein_embedding_folder, exist_ok=True)
 
     df_data = pd.read_csv(data_path)
-    uids = set(df_data['uniprotID'])
+    uids = set(df_data[UID_COL])
     pdbfiles = [os.path.join(pdb_dir, f'{uid}.pdb') for uid in uids]
 
     input_ = []
