@@ -2,6 +2,7 @@ import re
 import sys
 import pickle as pkl
 from functools import partial
+from collections import defaultdict
 
 import numba
 import numpy as np
@@ -11,8 +12,11 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import PatternFingerprint
 
 sys.path.append('/home/liuy/code/Retrosynthesis/')
+sys.path.append('/home/liuy/code/SynBio/enzyme-rxn-prediction/')
+sys.path.append('/home/liuy/code/SynBio/EnzymeCAGE/feature')
+from selenzyme_baseline.main import calc_rxn_simi_matrix
 from rdchiral_local.rdchiral import template_extractor
-from rdchiral_local.rdchiral.main import rdchiralRunText
+from pkgs.rxnmapper import BatchedMapper
 
 
 from localmapper import localmapper
@@ -186,15 +190,29 @@ def generate_weight_list(similarity_list):
 
 
 from multiprocessing import Pool
+def calc_rxnmapper_aam(rxns):
+    assert isinstance(rxns, list)
+    aam_list = []
+    rxn_mapper = BatchedMapper(batch_size=128)
+    rxns_to_run = [cano_rxn(remove_wildcard_atom(rxn), remain_isomer=False) for rxn in tqdm(rxns)]
+    for i, results in enumerate(tqdm(rxn_mapper.map_reactions_with_info(rxns_to_run), total=len(rxns_to_run))):
+        aam = results.get('mapped_rxn')
+        aam_list.append(aam)
+    return aam_list
+
 
 def get_tmpls_for_all_radius(rxns, radius):
-    func = partial(get_template, radius=radius)
-    aam_list = list(map(lambda x: RXN2AAM[x], rxns))
+    aam_list = calc_rxnmapper_aam(rxns)
+    for i in range(len(aam_list)):
+        if not aam_list[i]:
+            aam_list[i] = rxns[i]
+    
     rxn_to_alltmpls = {}
     all_template_list = []
+    func = partial(get_template, radius=radius)
     with Pool(20) as pool:
         for i, templates in enumerate(tqdm(pool.imap(func, aam_list), total=len(aam_list), desc='extracting templates')):
-            if len(templates) < len(radius):
+            if not templates or len(templates) < len(radius):
                 # cannot have null template, if None, replace with the full reaction
                 templates = [aam_list[i]] * len(radius)
             rxn_to_alltmpls[rxns[i]] = templates
@@ -208,22 +226,6 @@ def get_tmpls_for_all_radius(rxns, radius):
         tmpl_to_fp[template] = calc_template_fp(template)
 
     return tmpl_to_fp, rxn_to_alltmpls
-
-
-def calc_rxn_similarity_hier_batch(query_rxns, candidate_rxns):
-    radius = [0, 1, 2, 3, 4, 6, 8, 10]
-    all_rxns = list(set(query_rxns + candidate_rxns))
-    tmpl_to_fp, rxn_to_alltmpls = get_tmpls_for_all_radius(all_rxns, radius)
-    
-    # TODO remove chirality
-    for q_rxn in tqdm(query_rxns):
-        for c_rxn in candidate_rxns:
-            t1_list = rxn_to_alltmpls[q_rxn]
-            t2_list = rxn_to_alltmpls[c_rxn]
-            
-    
-    
-
 
 
 def calc_rxn_similarity_hier(r1, r2, verbose=False):
@@ -284,40 +286,122 @@ def calc_rxn_similarity_hier(r1, r2, verbose=False):
     return final_similarity
 
 
-if __name__ == '__main__':
+def calc_rxn_similarity_hier_batch(query_rxns, candidate_rxns, mid_save_path=None):
+    radius_list = [0, 1, 2, 3, 4, 6, 8, 10]
+    all_rxns = list(set(query_rxns) | set(candidate_rxns))
+    tmpl_to_fp, rxn_to_alltmpls = get_tmpls_for_all_radius(all_rxns, radius_list)
+    # rxn_to_alltmpls: {rxn1: [tmpl1, tmpl2, ...], rxn2: [tmpl1, tmpl2, ...], ...}
+    # size of each value: len(radius_list)
     
-    radius = [0, 1, 2, 3, 4, 6, 8, 10]
+    print('=' * 80)
+    print(f'Calculating the molecule level reaction similarity...')
+    print('=' * 80)
+    backbone_simi_map = calc_rxn_simi_matrix(query_rxns, candidate_rxns)
     
+    print('=' * 80)
+    print(f'Calculating template similarity matrix...')
+    print('=' * 80)
+    radius_to_simi_matrix = {}
+    radius_to_template_index = {}
+    for radius_index, radius in tqdm(enumerate(radius_list), desc='calc_template_similarity'):
+        template_list = [rxn_to_alltmpls[rxn][radius_index] for rxn in all_rxns]
+        template_index_map = {template: index for index, template in enumerate(template_list)}
+        radius_to_template_index[radius_index] = template_index_map
+        
+        tmpl_simi_matrix = []
+        for tmpl in tqdm(template_list):
+            simi_list = calc_template_similarity(tmpl, template_list, tmpl_to_fp)
+            tmpl_simi_matrix.append(simi_list)
+        tmpl_simi_matrix = np.stack(tmpl_simi_matrix)
+        radius_to_simi_matrix[radius_index] = tmpl_simi_matrix
+    
+    if mid_save_path is not None:
+        with open(mid_save_path, 'wb') as f:
+            pkl.dump((radius_to_simi_matrix, radius_to_template_index), f)
+            
+    
+    radius_index_to_calc_ccr = 1
+            
+    template_list = []
+    for rxn in all_rxns:
+        t_list = rxn_to_alltmpls[rxn]
+        template_list.append(t_list[radius_index_to_calc_ccr])
+    template_list = list(set(template_list))
+    template_to_num_atoms = {}
+    for template in template_list:
+        template_to_num_atoms[template] = sum([Chem.MolFromSmarts(smarts).GetNumAtoms() for smarts in template.split('>>')])
+    
+    rxn_to_num_atoms = {}
+    for rxn in all_rxns:
+        rxn_to_num_atoms[rxn] = sum([Chem.MolFromSmiles(smi).GetNumAtoms() for smi in rxn.split('>>')])
+    
+    similarity_map = defaultdict(dict)
+    for r1 in tqdm(query_rxns, desc='calc_overall_similarity'):
+        for r2 in candidate_rxns:
+            t1_list = rxn_to_alltmpls[r1]
+            t2_list = rxn_to_alltmpls[r2]
+            
+            simi_list = []
+            for radius_index, radius in enumerate(radius_list):
+                template_index_map = radius_to_template_index[radius_index]
+                t1 = t1_list[radius_index]
+                t2 = t2_list[radius_index]
+                t1_idx = template_index_map[t1]
+                t2_idx = template_index_map[t2]
+                simi = radius_to_simi_matrix[radius_index][t1_idx][t2_idx]
+                simi_list.append(simi)
+            
+            # templates of radius 0 and 1 are used to calculate the template similarity(reaction center similarity)
+            reaction_center_simi_list = simi_list[:2]
+            # templates of radius 2 and above are used to calculate the chemical environment similarity
+            chemical_env_simi_list = simi_list[2:]
+            
+            if reaction_center_simi_list[1] > 0.9 and reaction_center_simi_list[0] < 0.5:
+                template_similarity = max(reaction_center_simi_list)
+            else:
+                template_similarity = np.mean(reaction_center_simi_list)
+            
+            chem_env_similarity = np.mean(chemical_env_simi_list)
+
+            # ccr is center cover rate, which mean (number of atoms in the reaction center) / (number of atoms in the reaction)
+            t1, t2 = t1_list[radius_index_to_calc_ccr], t2_list[radius_index_to_calc_ccr]
+            ccr1 = template_to_num_atoms[t1] / rxn_to_num_atoms[r1]
+            ccr2 = template_to_num_atoms[t2] / rxn_to_num_atoms[r2]
+            ccr = ((ccr1 + ccr2) / 2) ** 2
+
+            if template_similarity >= 0.75:
+                overall_similarity = 0.5
+            elif 0.75 > template_similarity >= 0.5:
+                overall_similarity = 0.2
+            else:
+                overall_similarity = 0.1
+            
+            backbone_level_similarity = backbone_simi_map[r1][r2]
+
+            # ccr high: the molecule is small, the reaction center will take a larger part of the molecule, so the chem_env_similarity will be more accurate
+            # ccr low: the molecule is large, the reaction center will take a smaller part of the molecule, so the backbone_level_similarity will be slightly more accurate
+            overall_similarity += (backbone_level_similarity*(1-ccr) + chem_env_similarity * ccr) / 2
+            
+            similarity_map[r1][r2] = overall_similarity
+
+    return similarity_map
+
+
+def main_rhea():
     df_rhea_v2502 = pd.read_csv('/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/rhea_rxn2uids.csv')
     rxns = df_rhea_v2502['CANO_RXN_SMILES'].unique()
     
-    func = partial(get_template, radius=radius)
-    aam_list = list(map(lambda x: RXN2AAM[x], rxns))
-    rxn_to_alltmpls = {}
-    all_template_list = []
-    with Pool(20) as pool:
-        for i, templates in enumerate(tqdm(pool.imap(func, aam_list), total=len(aam_list), desc='extracting templates')):
-            if len(templates) < len(radius):
-                # cannot have null template, if None, replace with the full reaction
-                templates = [aam_list[i]] * len(radius)
-            rxn_to_alltmpls[rxns[i]] = templates
-            all_template_list.extend(templates)
-    all_template_list = list(set(all_template_list))
-
-    tmpl_to_fp = {}
-    for template in tqdm(all_template_list, desc='calculating template fp'):
-        if not isinstance(template, str):
-            continue
-        tmpl_to_fp[template] = calc_template_fp(template)
+    mid_save_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/all_tmpls_simi_matrix.pkl'
     
-    tmpl_simi_matrix = []
-    for tmpl in tqdm(all_template_list):
-        simi_list = calc_template_similarity(tmpl, all_template_list, tmpl_to_fp)
-        tmpl_simi_matrix.append(simi_list)
+    similarity_map = calc_rxn_similarity_hier_batch(rxns, rxns, mid_save_path=mid_save_path)
     
-    s = np.stack(tmpl_simi_matrix)
-    save_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/all_tmpls_simi_matrix.npz'
-    np.savez_compressed(save_path, templates=all_template_list, similarity_matrix=s)
+    save_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/rxn_hier_similarity_map.pkl'
+    with open(save_path, 'wb') as f:
+        pkl.dump(similarity_map, f)
     
     print(f'Save to {save_path}')
     
+
+if __name__ == '__main__':
+        
+    main_rhea()

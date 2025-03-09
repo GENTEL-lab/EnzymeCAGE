@@ -16,7 +16,8 @@ import torch
 import esm
 from Bio import PDB
 
-from utils import check_dir, cano_rxn, tranverse_folder, RXN_COL, UID_COL, SEQ_COL
+from enzymecage.base import UID_COL, RXN_COL, SEQ_COL
+from utils import check_dir, cano_rxn, tranverse_folder
 from gvp_torchdrug_feature import calc_gvp_feature
 from extract_pocket import get_pocket_info, extract_fix_num_residues, get_pocket_info_batch_new
 from extract_reacting_center import extract_reacting_center, calc_aam
@@ -297,9 +298,21 @@ def generate_mol_conformation(data_path, save_dir):
     all_smiles_list = [smi.replace('*', 'C') for smi in all_smiles_list]
     all_mols = list(set(all_smiles_list))
     
-    df_all_mols = pd.DataFrame({'SMILES': all_mols, 'ID': range(len(all_mols))})
     mol_index_path = os.path.join(save_dir, 'mol2id.csv')
-    df_all_mols.to_csv(mol_index_path, index=False)
+    if not os.path.exists(mol_index_path):
+        df_all_mols = pd.DataFrame({'SMILES': all_mols, 'ID': range(len(all_mols))})
+        df_all_mols.to_csv(mol_index_path, index=False)
+    else:
+        df_all_mols_old = pd.read_csv(mol_index_path)
+        existing_mols = set(df_all_mols_old['SMILES'])
+        # Incremental generation, not just re-generate all
+        mols_to_generate = [smi for smi in all_mols if smi not in existing_mols]
+        start_idx = df_all_mols_old['ID'].max() + 1
+        # df_all_mols is mols to generate
+        df_all_mols = pd.DataFrame({'SMILES': mols_to_generate, 'ID': range(start_idx, start_idx + len(mols_to_generate))})
+        # df_to_save is all mols info
+        df_to_save = pd.concat([df_all_mols_old, df_all_mols])
+        df_to_save.to_csv(mol_index_path, index=False)
     
     failed_idx_list = []
     for smiles, idx in tqdm(df_all_mols[['SMILES', 'ID']].values):
@@ -445,8 +458,8 @@ def main():
         
     feature_dir = os.path.join(os.path.dirname(args.data_path), 'feature')
     
-    # esm_model = 'esm2_t33_650M_UR50D'
-    esm_model = 'ESM-C_600M'
+    esm_model = 'esm2_t33_650M_UR50D'
+    # esm_model = 'ESM-C_600M'
     
     protein_feature_dir = os.path.join(feature_dir, 'protein')
     esm_node_feat_dir = os.path.join(protein_feature_dir, f'{esm_model}/node_level')
@@ -475,12 +488,25 @@ def main():
     calc_morgan_fp(args.data_path, morgan_save_path)
     calc_drfp(args.data_path, drfp_save_path)
     
+    # Extract reaction center
+    calc_reacting_center(args.data_path, reacting_center_dir)
+    
+    if not args.skip_calc_mol_conformation:
+        # May be the most time consuming step
+        # Generate molecular conformation by rdkit
+        generate_mol_conformation(args.data_path, mol_conformation_dir)
+    
+    # Calculate GVP features of pockets
+    calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
+    
     # Calculate ESM features of the full sequence
     if esm_model == 'esm2_t33_650M_UR50D':
         calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
     elif esm_model == 'ESM-C_600M':
         calc_seq_esm_C_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
     
+    # Extract esm feature of pocket nodes
+    get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
     
     # Extract pocket information if you don't specify the pocket directory
     if not args.pocket_dir:
@@ -490,22 +516,8 @@ def main():
         if not os.path.exists(pocket_info_save_path):
             get_pocket_info_batch_new(args.pocket_dir, pocket_info_save_path)
     
-    # Calculate GVP features of pockets
-    calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
-    
-    # Extract esm feature of pocket nodes
-    get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
-    
     # Make sure the number of nodes of pocket is the same between GVP and ESM feature
     check_pocket_feature(gvp_feat_path, esm_pocket_node_feature_path, log_dir=os.path.dirname(args.data_path))
-    
-    # Extract reaction center
-    calc_reacting_center(args.data_path, reacting_center_dir)
-    
-    if not args.skip_calc_mol_conformation:
-        # May be the most time consuming step
-        # Generate molecular conformation by rdkit
-        generate_mol_conformation(args.data_path, mol_conformation_dir)
     
     print('\n ###### Feature calculation is finished! ######\n')
     

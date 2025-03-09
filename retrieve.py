@@ -12,20 +12,25 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
 
 from utils import get_rdkit_mol
+from enzymecage.base import UID_COL, RXN_COL, SEQ_COL
 
 
 def init_mapping_info(df_pos_pairs):
     if 'Label' in df_pos_pairs.columns:
         df_pos_pairs = df_pos_pairs[df_pos_pairs['Label'] == 1]
-    
-    uid_col = 'uniprotID' if 'uniprotID' in df_pos_pairs.columns else 'UniprotID'
-        
+            
     uid_to_seq = {}
     rxn_to_uid = defaultdict(set)
-    for rxn, uid, seq in df_pos_pairs[['CANO_RXN_SMILES', uid_col, 'sequence']].values:
+    for rxn, uid, seq in df_pos_pairs[[RXN_COL, UID_COL, SEQ_COL]].values:
         uid_to_seq[uid] = seq
-        rxn_to_uid[rxn].add(uid) 
-    return uid_to_seq, rxn_to_uid
+        rxn_to_uid[rxn].add(uid)
+    
+    # rxn_to_template = {}
+    # if 'localmapper_template' in df_pos_pairs.columns:
+    #     rxn_to_template = dict(zip(df_pos_pairs['CANO_RXN_SMILES'], df_pos_pairs['localmapper_template']))
+    rxn_to_template = pkl.load(open('/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/rxn2template.pkl', 'rb'))
+    
+    return uid_to_seq, rxn_to_uid, rxn_to_template
 
 
 def getRSim(rcts_smi_counter, pros_smi_counter, cand_rcts_molid_counter, cand_pros_molid_counter, sim):
@@ -182,13 +187,8 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
             max_simi = max(S1, S2)
             rxn_simi_list.append(max_simi)
         cand_rxn_info = [each for each in list(zip(all_cand_rxns, rxn_simi_list))]
-        cand_rxn_info = sorted(cand_rxn_info, key=lambda x: x[1], reverse=True)[:topk]
-        similar_rxns_map[rxn_target] = cand_rxn_info
-    
-    import pickle as pkl
-    with open('similar_rxns_map.pkl', 'wb') as f:
-        pkl.dump(similar_rxns_map, f)
-        print(sss)
+        cand_rxn_info = sorted(cand_rxn_info, key=lambda x: x[1], reverse=True)
+        similar_rxns_map[rxn_target] = cand_rxn_info[:topk]
 
     result_list = []
     for rxn, similar_rxns in tqdm(similar_rxns_map.items(), desc='Calculating scores'):
@@ -207,12 +207,103 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
         result_list.append(df_result)
     
     df_final_result = pd.concat(result_list).reset_index(drop=True)
-    df_final_result['sequence'] = df_final_result['enzyme'].map(UID_TO_SEQ)
+    df_final_result[SEQ_COL] = df_final_result['enzyme'].map(UID_TO_SEQ)
     df_final_result[smiles_col] = df_final_result['reaction']
-    df_final_result['uniprotID'] = df_final_result['enzyme']
+    df_final_result[UID_COL] = df_final_result['enzyme']
     
     return df_final_result
+
+
+def run_retrieval_new(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk=10, exclude_rxns=set(), tmpl_simi_map=None):
+    """To retrieve candidate enzymes for each reaction in the df_data.
+
+    Args:
+        df_data (pd.DataFrame): Contains reactions to retrieve candidates.
+        df_db (pd.DataFrame): Positive enzyme-reaction pairs(with about 320k pairs).
+        smiles_col (str): Column name of reaction SMILES in df_data and df_db.
+        uid_to_proevi (dict): Uniprot ID to protein evidence dictionary.
+        uid_to_taxdis (dict): Uniprot ID to taxonomic distance dictionary.
+        topk (int, optional): Top k similar reaction to consider. Defaults to 10.
+
+    Returns:
+        pd.DataFrame: data with candidate enzymes.
+    """
+        
+    rxns_to_retrieve = {rxn for rxn in set(df_data[smiles_col]) if isinstance(rxn, str)}
+    all_cand_rxns = set(df_db[smiles_col]) - exclude_rxns - rxns_to_retrieve
     
+    UID_TO_SEQ, RXN_TO_UID, RXN_TO_TEMPLATE = init_mapping_info(df_db)    
+    cpd_simi_dict, cand_mol_to_id_dict = get_mol_simi_dict(rxns_to_retrieve, all_cand_rxns)
+    
+    use_template = True if tmpl_simi_map is not None and RXN_TO_TEMPLATE is not None else False
+    print('Use template similarity map: ', use_template)
+
+    similar_rxns_map = {}
+    for rxn_target in tqdm(rxns_to_retrieve, desc='Searching similar reactions'):
+        rcts_smi_counter = Counter(rxn_target.split('>>')[0].split('.'))
+        pros_smi_counter = Counter(rxn_target.split('>>')[1].split('.'))
+                
+        rxn_simi_list = []
+        template_simi_list = []
+        for cand_rxn in all_cand_rxns:
+            if cand_rxn == rxn_target:
+                rxn_simi_list.append(1)
+                continue
+            cand_rcts = [cand_mol_to_id_dict.get(smi) for smi in cand_rxn.split('>>')[0].split('.')]
+            cand_pros = [cand_mol_to_id_dict.get(smi) for smi in cand_rxn.split('>>')[1].split('.')]
+            cand_rcts_molid_counter, cand_pros_molid_counter = Counter(cand_rcts), Counter(cand_pros)
+            S1, S2, _ = getRSim(rcts_smi_counter, pros_smi_counter, cand_rcts_molid_counter, cand_pros_molid_counter, cpd_simi_dict)
+            max_simi = max(S1, S2)
+            rxn_simi_list.append(max_simi)
+            
+            
+            if not use_template:
+                tmpl_simi = 1
+            else:
+                template = RXN_TO_TEMPLATE.get(rxn_target)
+                cand_rxn_tmpl = RXN_TO_TEMPLATE.get(cand_rxn)
+                if not template or template not in tmpl_simi_map:
+                    tmpl_simi = 1
+                elif not cand_rxn_tmpl or cand_rxn_tmpl not in tmpl_simi_map:
+                    tmpl_simi = 0.5
+                else:
+                    tmpl_simi = tmpl_simi_map[template][cand_rxn_tmpl]
+            template_simi_list.append(tmpl_simi)
+        
+        fused_simi_list = [x * y for x, y in zip(rxn_simi_list, template_simi_list)]
+        cand_rxn_info = [each for each in list(zip(all_cand_rxns, fused_simi_list, rxn_simi_list, template_simi_list))]
+        cand_rxn_info = sorted(cand_rxn_info, key=lambda x: x[1], reverse=True)
+        similar_rxns_map[rxn_target] = cand_rxn_info[:topk]
+
+    result_list = []
+    for rxn, similar_rxns_info in tqdm(similar_rxns_map.items(), desc='Calculating scores'):
+        df_list = []
+        for cand_rxn, fused_simi, rxn_simi, tmpl_simi in similar_rxns_info:
+            cand_enzs = RXN_TO_UID.get(cand_rxn, [])
+            size = len(cand_enzs)
+            tax_dis_list = [uid_to_taxdis.get(uid, 30) for uid in cand_enzs]
+            pro_evi_list = [uid_to_proevi.get(uid, 5) for uid in cand_enzs]
+            
+            df = pd.DataFrame({'reaction': [rxn] * size, 'similar_rxn': [cand_rxn] * size, 'rxn_similarity': [rxn_simi] * size, 'enzyme': list(cand_enzs), 'tax_dis': tax_dis_list, 'pro_evi': pro_evi_list})
+            if use_template:
+                df['fused_similarity'] = fused_simi
+                df['template_similarity'] = tmpl_simi
+                
+            df['Score'] = df['rxn_similarity'] * 100 - df['tax_dis'] - 0.1 * df['pro_evi']
+            df_list.append(df)
+        df_result = pd.concat(df_list)
+        true_enzs = RXN_TO_UID.get(rxn, [])
+        df_result['Label'] = df_result['enzyme'].apply(lambda x: 1 if x in true_enzs else 0)
+        result_list.append(df_result)
+    
+    df_final_result = pd.concat(result_list).reset_index(drop=True)
+    df_final_result[SEQ_COL] = df_final_result['enzyme'].map(UID_TO_SEQ)
+    df_final_result[smiles_col] = df_final_result['reaction']
+    df_final_result[UID_COL] = df_final_result['enzyme']
+    
+    return df_final_result
+
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -222,6 +313,7 @@ def main():
     parser.add_argument('--smiles_col', type=str, default='CANO_RXN_SMILES', help='column name of reaction SMILES in the data')
     parser.add_argument('--proevi_path', type=str, default='./dataset/others/uid_to_proevi.pkl')
     parser.add_argument('--taxdis_path', type=str, default='./dataset/others/uid_to_taxdis.pkl')
+    parser.add_argument('--template_similarity', type=str, default=None)
     args = parser.parse_args()
     
     save_path = args.data_path.replace('.csv', '_retrievel_cands.csv')
@@ -235,13 +327,26 @@ def main():
         print(f'Load {len(exclude_rxns)} rxns to exclude')
     else:
         exclude_rxns = set()
+        
+    if args.template_similarity and os.path.exists(args.template_similarity):
+        print(f'Load template similarity info from: {args.template_similarity}')
+        data = pkl.load(open(args.template_similarity, 'rb'))
+        templates = data['templates']
+        simi_matrix = data['simi_matrix']
+        
+        tmpl_simi_map = {}
+        for i, t in enumerate(templates):
+            simi_map = dict(zip(templates, simi_matrix[i]))
+            tmpl_simi_map[t] = simi_map
+    else:
+        tmpl_simi_map = None
     
     df_data = pd.read_csv(args.data_path)
     df_db = pd.read_csv(args.db_path)
     uid_to_proevi = pkl.load(open(args.proevi_path, 'rb'))
     uid_to_taxdis = pkl.load(open(args.taxdis_path, 'rb'))
     
-    df_retrievel_cands = run_retrieval(df_data, df_db, args.smiles_col, uid_to_proevi, uid_to_taxdis, exclude_rxns=exclude_rxns)
+    df_retrievel_cands = run_retrieval_new(df_data, df_db, args.smiles_col, uid_to_proevi, uid_to_taxdis, exclude_rxns=exclude_rxns, tmpl_simi_map=tmpl_simi_map)
     df_retrievel_cands.to_csv(save_path, index=False)
     
     print(f'Retrieved candidates saved to: {save_path}')

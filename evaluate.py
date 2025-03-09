@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 from retrieve import init_mapping_info
+from enzymecage.base import UID_COL
 
 
 def eval_top_rank_result(df_test_inference: pd.DataFrame, test_rxns: list, pred_col='pred', true_enz_dict=None, top_percent=None, to_print=True):
@@ -14,7 +15,7 @@ def eval_top_rank_result(df_test_inference: pd.DataFrame, test_rxns: list, pred_
         df_test_inference (pd.DataFrame): testing data with prediction results.
     """
     rxn_col = 'CANO_RXN_SMILES' if 'CANO_RXN_SMILES' in df_test_inference.columns else 'reaction'
-    enz_col = 'enzyme' if 'enzyme' in df_test_inference.columns else 'uniprotID'
+    enz_col = 'enzyme' if 'enzyme' in df_test_inference.columns else UID_COL
 
     inference_result = {}
     for rxn, df in df_test_inference.groupby(rxn_col):
@@ -134,6 +135,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--result_path', type=str, required=True)
     parser.add_argument('--pos_pair_db_path', type=str, default=None)
+    parser.add_argument('--pred_col', type=str, default='pred')
     args = parser.parse_args()
     
     if not args.pos_pair_db_path:
@@ -152,7 +154,7 @@ def main():
     ef2_list = cal_all_ef(df_pred, top_percent=0.02)
     dcg, ef1, ef2 = np.mean(dcg_list), np.mean(ef1_list), np.mean(ef2_list)
     
-    sr_dict = eval_top_rank_result(df_pred, test_rxns, true_enz_dict=rxn_to_uid, to_print=False)
+    sr_dict = eval_top_rank_result(df_pred, test_rxns, true_enz_dict=rxn_to_uid, to_print=False, pred_col=args.pred_col)
     
     print('\n########### Evaluation Results ###########')
     print(f'Top-10 DCG: {dcg:.4f}')

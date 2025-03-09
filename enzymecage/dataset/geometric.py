@@ -12,6 +12,8 @@ from torch_geometric.data import Dataset, HeteroData, Data
 from torch_geometric.nn import radius_graph
 from rdkit import Chem
 
+from ..base import UID_COL, RXN_COL, SEQ_COL
+
 
 # note this is different from the 2D case
 allowable_features = {
@@ -144,6 +146,8 @@ class GeometricDataset(Dataset):
             self.pocket_node_feature = torch.load(pocket_node_feature)
         elif isinstance(pocket_node_feature, dict):
             self.pocket_node_feature = pocket_node_feature
+            
+        self.esm_dim = list(pocket_node_feature.values())[0].shape[1]
         
         if isinstance(protein_data, str) and os.path.exists(protein_data):
             print('Loading preprocessed protein data...')
@@ -158,10 +162,10 @@ class GeometricDataset(Dataset):
         print('Loading reaction feature dict...')
         self.rxn_feat_dict = pkl.load(open(rxn_feat_path, 'rb'))
 
-        self.uniprot_ids = self.df_data['uniprotID'].tolist()
-        self.rxns = self.df_data['CANO_RXN_SMILES'].tolist()
+        self.uniprot_ids = self.df_data[UID_COL].tolist()
+        self.rxns = self.df_data[RXN_COL].tolist()
         self.targets = self.df_data['Label'].tolist()
-        self.seqs = self.df_data['sequence'].tolist()
+        self.seqs = self.df_data[SEQ_COL].tolist()
 
         mol_to_index = pd.read_csv(os.path.join(mol_sdf_dir, 'mol2id.csv'))
         self.mol_to_index = dict(zip(mol_to_index['SMILES'], mol_to_index['ID']))
@@ -186,6 +190,8 @@ class GeometricDataset(Dataset):
                     sdf_path = os.path.join(mol_sdf_dir, f'{index}.sdf')
                     mol = Chem.SDMolSupplier(sdf_path)[0]
                     data, _ = mol_to_graph_data_obj_simple_3D(mol)
+                    if not hasattr(data, 'positions'):
+                        data.positions = torch.Tensor([[0, 0, 0] * len(data.x)])
                     data.radius_edge_index = radius_graph(data.positions, r=3, loop=False)
                     mol_data_dict[smiles] = data
                 except Exception as e:
@@ -326,8 +332,10 @@ class GeometricDataset(Dataset):
     def get_esm_feat(self, idx):
         if self.esm_feat_dict and self.seqs[idx] in self.esm_feat_dict:
             return torch.tensor(self.esm_feat_dict[self.seqs[idx]], dtype=torch.float)
+            # return self.esm_feat_dict[self.seqs[idx]]
         else:
-            return torch.zeros(1280)
+            print('ESM feature not found')
+            return torch.zeros(self.esm_dim)
     
 
 def load_geometric_dataset(data_path, protein_gvp_feat, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path):
@@ -339,10 +347,10 @@ def load_geometric_dataset(data_path, protein_gvp_feat, rxn_fp_path, mol_sdf_dir
     else:
         raise ValueError(f'Invalid data_path: {data_path}')
     
-    proteins = set(df_data['uniprotID'])
+    proteins = set(df_data[UID_COL])
     intersect_proteins = set(protein_gvp_feat.keys()) & proteins & set(esm_node_feature.keys())
     protein_dict_train = {k: v for k, v in protein_gvp_feat.items() if k in intersect_proteins}
-    df_data = df_data[df_data['uniprotID'].isin(intersect_proteins)]
+    df_data = df_data[df_data[UID_COL].isin(intersect_proteins)]
     print(f'size of df_data: {len(df_data)}')
     gvp_dataset = GeometricDataset(df_data, protein_dict_train, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path)
     return gvp_dataset

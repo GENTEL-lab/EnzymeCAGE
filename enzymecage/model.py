@@ -144,10 +144,11 @@ class EnzymeCAGE(BaseModel):
         self.model_device = device
         self.sigmoid_readout = sigmoid_readout
         self.dis_onehot_class = 16
+        self.esm_dim = 1152
 
         in_feat_dim = 0
         if self.use_esm:
-            in_feat_dim += 1280
+            in_feat_dim += self.esm_dim
         if self.use_structure:
             if self.interaction_method == 'geo-enhanced-interaction':
                 in_feat_dim += self.attention_output_dim * 4
@@ -169,12 +170,12 @@ class EnzymeCAGE(BaseModel):
         self.mol_repr_layer_norm = nn.LayerNorm(self.embed_dim)
         
         self.gvp_encoder = GVP_embedding((6, 3), (self.embed_dim//2, 16), (32, 1), (32, 1), seq_in=False)
-        self.enzyme_transform_layer = nn.Linear(1280+self.embed_dim, self.embed_dim)
+        self.enzyme_transform_layer = nn.Linear(self.esm_dim + self.embed_dim, self.embed_dim)
         
         self.pair_repr_linear = nn.Linear(self.dis_onehot_class, 32)
 
         if self.interaction_method == 'geo-enhanced-interaction':
-            enz_node_dim = 1280 + self.embed_dim
+            enz_node_dim = self.esm_dim + self.embed_dim
             enzyme_attn_embed_dim = 512
             self.enzyme_attention = MultiHeadAttention(num_heads=8, embed_dim=enzyme_attn_embed_dim, input_dim=enz_node_dim)
             self.substrate_attention = MultiHeadAttention(num_heads=8, embed_dim=self.embed_dim, input_dim=self.embed_dim)

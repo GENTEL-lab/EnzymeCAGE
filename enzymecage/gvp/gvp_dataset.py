@@ -12,6 +12,8 @@ from torch_geometric.data import Dataset, HeteroData
 from rdkit import Chem
 from dgllife.utils import CanonicalAtomFeaturizer, mol_to_bigraph
 
+from ..base import UID_COL, RXN_COL, SEQ_COL
+
 
 def rxn_to_graph(rxn_smiles):
     reaction_graphs = []
@@ -46,16 +48,16 @@ class GVPDataset(Dataset):
         print('Loading reaction feature dict...')
         self.rxn_feat_dict = pkl.load(open(rxn_feat_path, 'rb'))
 
-        self.uniprot_ids = self.df_data['uniprotID'].tolist()
-        self.rxns = self.df_data['CANO_RXN_SMILES'].tolist()
+        self.uniprot_ids = self.df_data[UID_COL].tolist()
+        self.rxns = self.df_data[RXN_COL].tolist()
         self.targets = self.df_data['Label'].tolist()
-        self.seqs = self.df_data['sequence'].tolist()
+        self.seqs = self.df_data[SEQ_COL].tolist()
 
         if pocket_data:
             if isinstance(pocket_data, str) and os.path.exists(pocket_data):
                 pocket_data = pd.read_csv(pocket_data)
             assert isinstance(pocket_data, pd.DataFrame)
-            self.uid_to_pocket = dict(zip(pocket_data['uniprotID'], pocket_data['pocket_residues']))
+            self.uid_to_pocket = dict(zip(pocket_data[UID_COL], pocket_data['pocket_residues']))
 
         if load_rxn_graph:
             rxns_unique = list(set(self.rxns))
@@ -172,11 +174,11 @@ class GVPGINDataset(Dataset):
         print('Loading reaction feature dict...')
         self.rxn_feat_dict = pkl.load(open(rxn_feat_path, 'rb'))
 
-        self.uniprot_ids = self.df_data['uniprotID'].tolist()
-        self.rxns = self.df_data['CANO_RXN_SMILES'].tolist()
+        self.uniprot_ids = self.df_data[UID_COL].tolist()
+        self.rxns = self.df_data[RXN_COL].tolist()
         self.substrate_list = [rxn.split('>')[0] for rxn in self.rxns]
         self.targets = self.df_data['Label'].tolist()
-        self.seqs = self.df_data['sequence'].tolist()
+        self.seqs = self.df_data[SEQ_COL].tolist()
 
 
     def len(self):
@@ -227,11 +229,11 @@ def get_data_path(model_conf, data_type='train'):
 def load_single_dataset(data_path, protein_dict, rxn_feat_path, esm_feature_path, pocket_data=None, unimol_feature_path=None, use_gat_encoder=False):
     # choose intersection of uniprotIDs from data and protein_dict
     df_data = pd.read_csv(data_path)
-    proteins = set(df_data['uniprotID'])
+    proteins = set(df_data[UID_COL])
 
     intersect_proteins = set(protein_dict.keys()) & proteins
     protein_dict_train = {k: v for k, v in protein_dict.items() if k in intersect_proteins}
-    df_data = df_data[df_data['uniprotID'].isin(intersect_proteins)]
+    df_data = df_data[df_data[UID_COL].isin(intersect_proteins)]
     gvp_dataset = GVPDataset(df_data, protein_dict_train, rxn_feat_path, pocket_data, esm_feature_path, unimol_feature_path, load_rxn_graph=use_gat_encoder)
     return gvp_dataset
 
@@ -262,11 +264,11 @@ def create_gvp_dataset(model_conf, protein_data_path, rxn_feat_path, pocket_data
 def load_gvpgin_dataset(data_path, protein_dict, substrate_dict, rxn_feat_path, esm_feature_path):
     # choose intersection of uniprotIDs from data and protein_dict
     df_data = pd.read_csv(data_path)
-    proteins = set(df_data['uniprotID'])
+    proteins = set(df_data[UID_COL])
 
     intersect_proteins = set(protein_dict.keys()) & proteins
     protein_dict_train = {k: v for k, v in protein_dict.items() if k in intersect_proteins}
-    df_data = df_data[df_data['uniprotID'].isin(intersect_proteins)]
+    df_data = df_data[df_data[UID_COL].isin(intersect_proteins)]
     gvp_dataset = GVPGINDataset(df_data, protein_dict_train, substrate_dict, rxn_feat_path, esm_feature_path)
     return gvp_dataset
 

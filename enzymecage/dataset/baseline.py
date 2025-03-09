@@ -5,6 +5,8 @@ import pandas as pd
 import torch
 from torch_geometric.data import Dataset, HeteroData
 
+from ..base import UID_COL, RXN_COL, SEQ_COL
+
 
 class BaselineDataset(Dataset):
     def __init__(self, df_data, rxn_feat_path, esm_feature_path):
@@ -16,14 +18,16 @@ class BaselineDataset(Dataset):
             self.df_data = df_data
 
         self.esm_feat_dict = pkl.load(open(esm_feature_path, 'rb')) if esm_feature_path else None
+        
+        self.esm_dim = list(self.esm_feat_dict.values())[0].shape[0]
 
         print('Loading reaction feature dict...')
         self.rxn_feat_dict = pkl.load(open(rxn_feat_path, 'rb'))
 
-        self.uniprot_ids = self.df_data['uniprotID'].tolist()
-        self.rxns = self.df_data['CANO_RXN_SMILES'].tolist()
+        self.uniprot_ids = self.df_data[UID_COL].tolist()
+        self.rxns = self.df_data[RXN_COL].tolist()
         self.targets = self.df_data['Label'].tolist()
-        self.seqs = self.df_data['sequence'].tolist()
+        self.seqs = self.df_data[SEQ_COL].tolist()
 
     def len(self):
         return len(self.df_data)
@@ -48,7 +52,7 @@ class BaselineDataset(Dataset):
             return torch.tensor(self.esm_feat_dict[self.seqs[idx]], dtype=torch.float)
         else:
             # print('ESM feature not found for sequence idx: ', idx)
-            return torch.zeros(1280)
+            return torch.zeros(self.esm_dim)
 
 
 def load_baseline_dataset(data_path, rxn_feat_path, esm_feature_path):

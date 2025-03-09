@@ -12,7 +12,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 model_dir = os.path.join(ROOT_DIR, 'enzymecage')
 sys.path.append(model_dir)
 from gvp.data import ProteinGraphDataset
-from utils import UID_COL
+from base import UID_COL
 
 
 three_to_one = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 

@@ -11,15 +11,17 @@ from enzymecage.model import EnzymeCAGE
 from enzymecage.baseline import Baseline
 from enzymecage.dataset.geometric import load_geometric_dataset
 from enzymecage.dataset.baseline import load_baseline_dataset
+from enzymecage.base import UID_COL, RXN_COL
 from utils import seed_everything
+
 
 
 def preprocess_infer_data(data_path):
     df_data = pd.read_csv(data_path)
-    if 'uniprotID' not in df_data.columns and 'enzyme' in df_data.columns:
-        df_data['uniprotID'] = df_data['enzyme']
-    if 'CANO_RXN_SMILES' not in df_data.columns and 'reaction' in df_data.columns:
-        df_data['CANO_RXN_SMILES'] = df_data['reaction']
+    if UID_COL not in df_data.columns and 'enzyme' in df_data.columns:
+        df_data[UID_COL] = df_data['enzyme']
+    if RXN_COL not in df_data.columns and 'reaction' in df_data.columns:
+        df_data[RXN_COL] = df_data['reaction']
     if 'Label' not in df_data.columns:
         df_data['Label'] = 0
     
@@ -69,7 +71,7 @@ def inference(model_conf):
     
     if model_conf.model == 'EnzymeCAGE':
         print(f'Loading protein dict...')
-        df_data = df_data[df_data['uniprotID'].isin(protein_gvp_feat.keys()) & df_data['uniprotID'].isin(esm_node_feature.keys())]
+        df_data = df_data[df_data[UID_COL].isin(protein_gvp_feat.keys()) & df_data[UID_COL].isin(esm_node_feature.keys())]
 
     print(f'len(infer_dataset): {len(infer_dataset)}')
     test_loader = DataLoader(infer_dataset, batch_size=model_conf.batch_size, shuffle=False, follow_batch=follow_batch)

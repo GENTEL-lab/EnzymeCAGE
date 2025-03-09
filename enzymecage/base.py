@@ -6,6 +6,11 @@ from tqdm import tqdm
 from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score
 
 
+UID_COL = 'uniprotID'
+SEQ_COL = 'sequence'
+RXN_COL = 'CANO_RXN_SMILES'
+
+
 class BaseModel(nn.Module):
     
     @torch.no_grad()
