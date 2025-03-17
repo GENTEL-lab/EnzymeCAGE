@@ -19,6 +19,8 @@ from utils import seed_everything, check_files
 
 TARGET_BATCH_SIZE = 256
 
+WEIGHT_PRINT_FLAG = False
+
 
 def get_accumulation_steps(batch_size):
     if batch_size >= TARGET_BATCH_SIZE // 2:
@@ -41,17 +43,35 @@ def backup_config(config_path, save_dir=None):
         yaml.dump(conf_dict, fp)
 
 
+def calculate_loss(loss_func, pred, target, batch_data):
+        if hasattr(batch_data, 'weight'):
+            weight = batch_data.weight
+        else:
+            weight = torch.ones_like(target)
+        
+        global WEIGHT_PRINT_FLAG
+        if not WEIGHT_PRINT_FLAG:
+            WEIGHT_PRINT_FLAG = True
+            print(f'weights: {weight}')
+            
+        weighted_loss = loss_func(pred, target) * weight
+        return torch.mean(weighted_loss)
+
+
 def main(model_conf):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     if model_conf.model == 'EnzymeCAGE':
         follow_batch = ['protein', 'reaction_feature', 'esm_feature', 'substrates', 'products']
-
+        esm_model = None
+        if hasattr(model_conf, 'esm_model'):
+            esm_model = model_conf.esm_model
         model = EnzymeCAGE(
             use_esm=model_conf.use_esm,
             use_structure=model_conf.use_structure,
             use_drfp=model_conf.use_drfp,
             use_prods_info=model_conf.use_prods_info,
+            esm_model=esm_model,
             interaction_method=model_conf.interaction_method,
             rxn_inner_interaction=model_conf.rxn_inner_interaction,
             pocket_inner_interaction=model_conf.pocket_inner_interaction,
@@ -68,6 +88,9 @@ def main(model_conf):
         
         print('Model save dir: ', model_conf.ckpt_dir)
 
+        weight_col = model_conf.weight_col if hasattr(model_conf, 'weight_col') else None
+        print(f'Sample weight column: {weight_col}')
+        
         train_set, valid_set, test_set = create_geometric_dataset(train_path=model_conf.train_path,
                                                                   valid_path=model_conf.valid_path,
                                                                   test_path=model_conf.test_path,
@@ -76,7 +99,8 @@ def main(model_conf):
                                                                   mol_sdf_dir=model_conf.mol_conformation, 
                                                                   esm_node_feature_path=model_conf.esm_node_feature, 
                                                                   esm_mean_feature_path=model_conf.esm_mean_feature, 
-                                                                  reaction_center_path=model_conf.reaction_center)
+                                                                  reaction_center_path=model_conf.reaction_center,
+                                                                  weight_col=weight_col)
     
     elif model_conf.model == 'baseline':        
         follow_batch = ['reaction_feature', 'esm_feature']
@@ -101,33 +125,33 @@ def main(model_conf):
     lr_init = model_conf.lr_init
     optimizer = torch.optim.Adam(model.parameters(), lr=lr_init)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 0.95 ** epoch)
-    loss_func = nn.BCEWithLogitsLoss()
-        
+    loss_func = nn.BCEWithLogitsLoss(reduction='none')
+
     os.makedirs(model_conf.ckpt_dir, exist_ok=True)
-    
+        
     best_metric = 0
     for epoch in range(model_conf.num_epochs):
         print(f'================= Epoch {epoch} =================')
-        binary_loss_sum = 0
+        loss_total = 0
         model.train()
         target_list = []
         pred_list = []
         all_rxns = []
         
-        for i, batch in enumerate(tqdm(train_loader)):
+        for _, batch in enumerate(tqdm(train_loader)):
             batch.epoch = epoch
             target = batch.y.to(device)
             batch.to(device)
 
             pred = model(batch)
-            binary_loss = loss_func(pred, target)
-            loss = binary_loss
+            # loss = loss_func(pred, target)
+            loss = calculate_loss(loss_func, pred, target, batch)
             
             loss.backward()            
             optimizer.step()
             optimizer.zero_grad()
             
-            binary_loss_sum += binary_loss.item()
+            loss_total += loss.item()
             target_list.append(target.detach())
             pred_list.append(pred.detach())
             all_rxns.extend(batch.rxn)
@@ -136,16 +160,14 @@ def main(model_conf):
 
         lr = optimizer.state_dict()['param_groups'][0]['lr']
         n_step = len(train_loader)
-        print(f"binary loss: {round(binary_loss_sum / n_step, 6)}, lr: {round(lr, 6)}\n")
+        print(f"binary loss: {round(loss_total / n_step, 6)}, lr: {round(lr, 6)}\n")
         
         target_list = torch.concat(target_list)
         pred_list = torch.concat(pred_list)
         
         if not model.sigmoid_readout:
             pred_list = torch.sigmoid(pred_list)
-            
-        print(f"\n {pred_list[0]} \n")
-            
+                        
         train_metric = model.calc_metric(pred_list, target_list, all_rxns)
         for k, v in train_metric.items():
             print(f'Train {k}: {round(v, 4)}')

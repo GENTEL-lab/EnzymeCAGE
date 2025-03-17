@@ -18,10 +18,12 @@ from enzymecage.base import UID_COL, RXN_COL, SEQ_COL
 def init_mapping_info(df_pos_pairs):
     if 'Label' in df_pos_pairs.columns:
         df_pos_pairs = df_pos_pairs[df_pos_pairs['Label'] == 1]
-            
+    
+    uid_col = UID_COL if UID_COL in df_pos_pairs.columns else 'uniprotID'
+    
     uid_to_seq = {}
     rxn_to_uid = defaultdict(set)
-    for rxn, uid, seq in df_pos_pairs[[RXN_COL, UID_COL, SEQ_COL]].values:
+    for rxn, uid, seq in df_pos_pairs[[RXN_COL, uid_col, SEQ_COL]].values:
         uid_to_seq[uid] = seq
         rxn_to_uid[rxn].add(uid)
     

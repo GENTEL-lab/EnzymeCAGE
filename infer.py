@@ -12,8 +12,7 @@ from enzymecage.baseline import Baseline
 from enzymecage.dataset.geometric import load_geometric_dataset
 from enzymecage.dataset.baseline import load_baseline_dataset
 from enzymecage.base import UID_COL, RXN_COL
-from utils import seed_everything
-
+from utils import seed_everything, check_files
 
 
 def preprocess_infer_data(data_path):
@@ -35,11 +34,15 @@ def inference(model_conf):
     if model_conf.model == 'EnzymeCAGE':
         
         follow_batch = ['protein', 'reaction_feature', 'esm_feature', 'substrates', 'products']
+        esm_model = None
+        if hasattr(model_conf, 'esm_model'):
+            esm_model = model_conf.esm_model
         model = EnzymeCAGE(
             use_esm=model_conf.use_esm,
             use_structure=model_conf.use_structure,
             use_drfp=model_conf.use_drfp,
             use_prods_info=model_conf.use_prods_info,
+            esm_model=esm_model,
             interaction_method=model_conf.interaction_method,
             rxn_inner_interaction=model_conf.rxn_inner_interaction,
             pocket_inner_interaction=model_conf.pocket_inner_interaction,
@@ -116,5 +119,6 @@ if __name__ == "__main__":
     
     seed = 42 if not hasattr(model_conf, 'seed') else model_conf.seed
     seed_everything(seed)
-
+    
+    check_files(model_conf)
     inference(model_conf)

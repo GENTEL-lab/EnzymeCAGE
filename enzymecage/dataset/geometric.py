@@ -133,7 +133,7 @@ def mol_to_graph_data_obj_simple_3D(mol):
 
 
 class GeometricDataset(Dataset):
-    def __init__(self, df_data, protein_data, rxn_feat_path, mol_sdf_dir, pocket_node_feature, esm_feature_path=None, reacting_center_path=None):
+    def __init__(self, df_data, protein_data, rxn_feat_path, mol_sdf_dir, pocket_node_feature, esm_feature_path=None, reacting_center_path=None, weight_col=None):
         super(GeometricDataset, self).__init__()
 
         if isinstance(df_data, str) and os.path.exists(df_data):
@@ -166,6 +166,14 @@ class GeometricDataset(Dataset):
         self.rxns = self.df_data[RXN_COL].tolist()
         self.targets = self.df_data['Label'].tolist()
         self.seqs = self.df_data[SEQ_COL].tolist()
+        
+        if weight_col is not None:
+            if weight_col in self.df_data.columns:
+                self.weights = self.df_data[weight_col].tolist()
+            else:
+                raise ValueError(f'Invalid weight column name: {weight_col}')
+        else:
+            self.weights = torch.ones(len(self.df_data))
 
         mol_to_index = pd.read_csv(os.path.join(mol_sdf_dir, 'mol2id.csv'))
         self.mol_to_index = dict(zip(mol_to_index['SMILES'], mol_to_index['ID']))
@@ -180,25 +188,29 @@ class GeometricDataset(Dataset):
     
     def load_mol_feat(self, mol_sdf_dir, use_cache=True):
         cache_path = os.path.join(mol_sdf_dir, 'mol_graph_dict.pt')
+        
         if os.path.exists(cache_path) and use_cache:
             print('Loading cached mol graph data...')
             mol_data_dict = torch.load(cache_path)
-        else:
-            mol_data_dict = {}
-            for smiles, index in tqdm(self.mol_to_index.items()):
-                try:
-                    sdf_path = os.path.join(mol_sdf_dir, f'{index}.sdf')
-                    mol = Chem.SDMolSupplier(sdf_path)[0]
-                    data, _ = mol_to_graph_data_obj_simple_3D(mol)
-                    if not hasattr(data, 'positions'):
-                        data.positions = torch.Tensor([[0, 0, 0] * len(data.x)])
-                    data.radius_edge_index = radius_graph(data.positions, r=3, loop=False)
-                    mol_data_dict[smiles] = data
-                except Exception as e:
-                    print(e)
-                    print(f'Conformation feature loading failed: {smiles}')
-                    pass
-            torch.save(mol_data_dict, cache_path)
+            if len(self.mol_to_index.keys() - mol_data_dict.keys()) == 0:
+                # Should be the same, or means there are data updates, need update cache
+                return mol_data_dict
+        print('Data updates detected, reload graph data...')
+        mol_data_dict = {}
+        for smiles, index in tqdm(self.mol_to_index.items()):
+            try:
+                sdf_path = os.path.join(mol_sdf_dir, f'{index}.sdf')
+                mol = Chem.SDMolSupplier(sdf_path)[0]
+                data, _ = mol_to_graph_data_obj_simple_3D(mol)
+                if not hasattr(data, 'positions'):
+                    data.positions = torch.Tensor([[0, 0, 0] * len(data.x)])
+                data.radius_edge_index = radius_graph(data.positions, r=3, loop=False)
+                mol_data_dict[smiles] = data
+            except Exception as e:
+                print(e)
+                print(f'Conformation feature loading failed: {smiles}')
+                pass
+        torch.save(mol_data_dict, cache_path)
         
         return mol_data_dict
 
@@ -296,6 +308,7 @@ class GeometricDataset(Dataset):
         data.seq = protein_seq
         data.reaction_feature = torch.tensor(self.rxn_feat_dict[reaction], dtype=torch.float)
         data.esm_feature = self.get_esm_feat(idx)
+        data.weight = torch.tensor(self.weights[idx], dtype=torch.float)
 
         substrates_data, products_data = self.get_rxn_graph_data(reaction)
         data['substrates'].x = substrates_data.x
@@ -338,7 +351,7 @@ class GeometricDataset(Dataset):
             return torch.zeros(self.esm_dim)
     
 
-def load_geometric_dataset(data_path, protein_gvp_feat, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path):
+def load_geometric_dataset(data_path, protein_gvp_feat, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path, weight_col=None):
     # choose intersection of uniprotIDs from data and protein_dict
     if isinstance(data_path, str) and os.path.exists(data_path):
         df_data = pd.read_csv(data_path)
@@ -352,7 +365,7 @@ def load_geometric_dataset(data_path, protein_gvp_feat, rxn_fp_path, mol_sdf_dir
     protein_dict_train = {k: v for k, v in protein_gvp_feat.items() if k in intersect_proteins}
     df_data = df_data[df_data[UID_COL].isin(intersect_proteins)]
     print(f'size of df_data: {len(df_data)}')
-    gvp_dataset = GeometricDataset(df_data, protein_dict_train, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path)
+    gvp_dataset = GeometricDataset(df_data, protein_dict_train, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path, weight_col)
     return gvp_dataset
 
 
@@ -365,7 +378,8 @@ def create_geometric_dataset(
         mol_sdf_dir, 
         esm_node_feature_path, 
         esm_mean_feature_path, 
-        reaction_center_path
+        reaction_center_path,
+        weight_col=None,
     ):
     
     print('Loading preprocessed protein data from: ', protein_gvp_feat)
@@ -374,8 +388,9 @@ def create_geometric_dataset(
     print(f'Time taken to load protein data: {round(time.time() - t1, 2)} s')
 
     esm_node_feature = torch.load(esm_node_feature_path)
-
-    train_set = load_geometric_dataset(train_path, protein_dict, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path)
+    
+    # only training data needs sample weight
+    train_set = load_geometric_dataset(train_path, protein_dict, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path, weight_col)
     valid_set = load_geometric_dataset(valid_path, protein_dict, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path)
     test_set = load_geometric_dataset(test_path, protein_dict, rxn_fp_path, mol_sdf_dir, esm_node_feature, esm_mean_feature_path, reaction_center_path)
     
