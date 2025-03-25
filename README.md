@@ -30,7 +30,7 @@ pip install transformers==4.14.1
 * Evaluate the performance of the model
 
 ## Dataset
-First, download the [dataset](https://zenodo.org/records/14613354) and extract it to the current directory.
+We are still preparing the updated data, which is expected to be released before April 15.
 
 ### Option 1: Directly use the extracted pockets
 We have run AlphaFill and pre-extracted the enzyme pockets from the dataset, and you can directly use this part of the data to reproduce the experimental results. The pockets are located in `./dataset/pocket/alphafill_8A`
