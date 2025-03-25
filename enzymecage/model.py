@@ -144,7 +144,7 @@ class EnzymeCAGE(BaseModel):
         self.model_device = device
         self.sigmoid_readout = sigmoid_readout
         self.dis_onehot_class = 16
-        self.esm_dim = 1152
+        self.esm_dim = 1280
 
         in_feat_dim = 0
         if self.use_esm:
