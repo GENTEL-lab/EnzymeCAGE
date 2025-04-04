@@ -9,7 +9,7 @@ from .base import BaseModel
 
 
 class Baseline(BaseModel):
-    def __init__(self, hidden_dims=[3328, 2048], device='cpu', sigmoid_readout=False):
+    def __init__(self, esm_model, hidden_dims=[3328, 2048], device='cpu', sigmoid_readout=False):
         super(Baseline, self).__init__()
         # hidden_dim = 3328
         self.mlp = nn.Sequential(

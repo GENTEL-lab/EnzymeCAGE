@@ -63,7 +63,10 @@ def inference(model_conf):
     
     elif model_conf.model == 'baseline':
         follow_batch = ['reaction_feature', 'esm_feature']
-        model = Baseline(device=device)        
+        esm_model = None
+        if hasattr(model_conf, 'esm_model'):
+            esm_model = model_conf.esm_model
+        model = Baseline(device=device, esm_model=esm_model)        
         infer_dataset = load_baseline_dataset(model_conf.data_path, model_conf.rxn_fp, model_conf.esm_mean_feature)
 
     

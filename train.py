@@ -104,7 +104,10 @@ def main(model_conf):
     
     elif model_conf.model == 'baseline':        
         follow_batch = ['reaction_feature', 'esm_feature']
-        model = Baseline(device=device)
+        esm_model = None
+        if hasattr(model_conf, 'esm_model'):
+            esm_model = model_conf.esm_model
+        model = Baseline(device=device, esm_model=esm_model)
         print('Model save dir: ', model_conf.ckpt_dir)
         train_set, valid_set, test_set = create_baseline_dataset(train_path=model_conf.train_path,
                                                                  valid_path=model_conf.valid_path,
