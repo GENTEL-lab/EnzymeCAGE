@@ -4,10 +4,10 @@
 
 ## Environment 
 ```
-conda create -n enzymecage python=3.10
+conda create -n enzymecage python=3.12
 conda install -c conda-forge -c bioconda mmseqs2=15.6f452 -y
 pip install torch==2.1.0 torch-geometric==2.5.3 torch-scatter==2.1.2 torch-cluster==1.6.3 -f https://download.pytorch.org/whl/cu121/torch_stable.html
-pip install pyyaml==6.0
+pip install pyyaml
 pip install tqdm==4.66.2
 pip install numpy==1.24.3
 pip install pandas==1.4.2
@@ -31,7 +31,7 @@ pip install transformers==4.46.3
 * Evaluate the performance of the model
 
 ## Dataset
-We are still preparing the updated data, which is expected to be released before May 6.
+We are still preparing the updated data, which is expected to be released before May 8 (holiday is on the way!).
 
 ### Option 1: Directly use the extracted pockets
 We have run AlphaFill and pre-extracted the enzyme pockets from the dataset, and you can directly use this part of the data to reproduce the experimental results. The pockets are located in `./dataset/pocket/alphafill_8A`
