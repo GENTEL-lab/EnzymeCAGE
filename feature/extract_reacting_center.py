@@ -273,29 +273,54 @@ def get_rdkit_mol(mol):
     return mol
 
 
+# def calc_aam(data_path, save_dir, append=True, rerun=False):
+#     save_path = os.path.join(save_dir, 'rxn2aam.pkl')
+#     if os.path.exists(save_path) and append and not rerun:
+#         cached_rxn2aam = pkl.load(open(save_path, 'rb'))
+#     else:
+#         cached_rxn2aam = {}
+
+#     rxn_mapper = BatchedMapper(batch_size=128)
+    
+#     df_data = pd.read_csv(data_path)
+#     rxns_to_run = df_data['CANO_RXN_SMILES'].unique()
+#     rxns_to_run = [rxn for rxn in rxns_to_run if rxn not in cached_rxn2aam]
+    
+#     result_list = []
+#     for results in tqdm(rxn_mapper.map_reactions_with_info(rxns_to_run), total=len(rxns_to_run)):
+#         result_list.append(results.get('mapped_rxn'))
+
+#     rxn2aam = dict(zip(rxns_to_run, result_list))
+#     rxn2aam.update(cached_rxn2aam)
+    
+#     with open(save_path, 'wb') as f:
+#         pkl.dump(rxn2aam, f)
+
+
+
 def calc_aam(data_path, save_dir, append=True, rerun=False):
+    
+    from localmapper import localmapper
+    mapper = localmapper(device='cpu')
+
     save_path = os.path.join(save_dir, 'rxn2aam.pkl')
     if os.path.exists(save_path) and append and not rerun:
         cached_rxn2aam = pkl.load(open(save_path, 'rb'))
     else:
         cached_rxn2aam = {}
-
-    rxn_mapper = BatchedMapper(batch_size=128)
     
     df_data = pd.read_csv(data_path)
     rxns_to_run = df_data['CANO_RXN_SMILES'].unique()
     rxns_to_run = [rxn for rxn in rxns_to_run if rxn not in cached_rxn2aam]
     
-    result_list = []
-    for results in tqdm(rxn_mapper.map_reactions_with_info(rxns_to_run), total=len(rxns_to_run)):
-        result_list.append(results.get('mapped_rxn'))
+    result_list = [mapper.get_atom_map(rxn) for rxn in tqdm(rxns_to_run)]
 
     rxn2aam = dict(zip(rxns_to_run, result_list))
     rxn2aam.update(cached_rxn2aam)
     
     with open(save_path, 'wb') as f:
         pkl.dump(rxn2aam, f)
-
+        
 
 def extract_reacting_center(rxn, rxn2aam):
     rxn_aam = rxn2aam.get(rxn)

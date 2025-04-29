@@ -18,7 +18,7 @@ from Bio import PDB
 
 from enzymecage.base import UID_COL, RXN_COL, SEQ_COL
 from utils import check_dir, cano_rxn, tranverse_folder
-from gvp_torchdrug_feature import calc_gvp_feature
+# from gvp_torchdrug_feature import calc_gvp_feature
 from extract_pocket import get_pocket_info, extract_fix_num_residues, get_pocket_info_batch_new
 from extract_reacting_center import extract_reacting_center, calc_aam
 
@@ -346,7 +346,8 @@ def get_pocket_info_batch(input_dir, save_path, pocket_save_dir=None, max_residu
 
 def get_esm_pocket_feature(pocket_info_path, esm_node_feat_dir, save_path):
     df_pocket_data = pd.read_csv(pocket_info_path)
-    uid_to_pocket = dict(zip(df_pocket_data[UID_COL], df_pocket_data['pocket_residues']))
+    uids = [str(each) for each in df_pocket_data[UID_COL].values]
+    uid_to_pocket = dict(zip(uids, df_pocket_data['pocket_residues']))
     esm_file_list = [each for each in tranverse_folder(esm_node_feat_dir) if each.endswith('.npz')]
     
     uid_to_pocket_node_feature = {}
@@ -354,28 +355,28 @@ def get_esm_pocket_feature(pocket_info_path, esm_node_feat_dir, save_path):
         uid = os.path.basename(filepath).replace('.npz', '')
         if uid in uid_to_pocket_node_feature:
             continue
-        
         if not filepath.endswith('npz'):
             continue
-        esm_node_feature = np.load(filepath)['node_feature']
         
+        esm_node_feature = np.load(filepath)['node_feature']
         pocket_residue_ids = uid_to_pocket.get(uid)
         if not isinstance(pocket_residue_ids, str):
             # print('???')
             continue
-    
+        
         pocket_residue_ids = [int(i)-1 for i in pocket_residue_ids.split(',')]
         try:
             pocket_node_feature = esm_node_feature[pocket_residue_ids]
         except Exception as e:
             print(e)
             print(uid, ' Error')
-            print(sss)
+            # print(sss)
+            continue
         
         uid_to_pocket_node_feature[uid] = pocket_node_feature
         
     torch.save(uid_to_pocket_node_feature, save_path)
-    print(f'Save esm pocket feature to {save_path}\n')
+    print(f'Save esm feature of {len(uid_to_pocket_node_feature)} pockets to {save_path}\n')
 
 
 def check_pocket_feature(gvp_feature_path, esm_feature_path, log_dir=None):
@@ -457,7 +458,8 @@ def main():
         pocket_dir = args.pocket_dir
         
     # feature_dir = os.path.join(os.path.dirname(args.data_path), 'feature')
-    feature_dir = '/home/liuy/data/SynBio/Phosphatase/feature'
+    # feature_dir = '/home/liuy/data/SynBio/Terpene/feature'
+    feature_dir = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature'
     
     # esm_model = 'esm2_t33_650M_UR50D'
     esm_model = 'ESM-C_600M'
@@ -485,17 +487,17 @@ def main():
     os.makedirs(os.path.dirname(esm_mean_feat_path), exist_ok=True)
     os.makedirs(os.path.dirname(esm_pocket_node_feature_path), exist_ok=True)
     os.makedirs(os.path.dirname(gvp_feat_path), exist_ok=True)
-    # os.makedirs(os.path.dirname(morgan_save_path), exist_ok=True)
-    # os.makedirs(os.path.dirname(drfp_save_path), exist_ok=True)
-    # os.makedirs(mol_conformation_dir, exist_ok=True)
-    # os.makedirs(reacting_center_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(morgan_save_path), exist_ok=True)
+    os.makedirs(os.path.dirname(drfp_save_path), exist_ok=True)
+    os.makedirs(mol_conformation_dir, exist_ok=True)
+    os.makedirs(reacting_center_dir, exist_ok=True)
     
     # Calculate reaction fingerprints
-    # calc_morgan_fp(args.data_path, morgan_save_path)
-    # calc_drfp(args.data_path, drfp_save_path)
+    calc_morgan_fp(args.data_path, morgan_save_path)
+    calc_drfp(args.data_path, drfp_save_path)
     
     # # # Extract reaction center
-    # calc_reacting_center(args.data_path, reacting_center_dir)
+    calc_reacting_center(args.data_path, reacting_center_dir)
     
     # if not args.skip_calc_mol_conformation:
     #     # May be the most time consuming step
@@ -504,18 +506,20 @@ def main():
     
     # return
     
-    gvp_feat_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/gvp_feature/gvp_protein_feature_mix-af-p2rank.pt'
+    # gvp_feat_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/gvp_feature/gvp_protein_feature_mix-af-p2rank.pt'
     
     # Calculate GVP features of pockets
-    calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
-        
-    # # Calculate ESM features of the full sequence
+    # calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
+    
+    # return
+    
+    # Calculate ESM features of the full sequence
     # if esm_model == 'esm2_t33_650M_UR50D':
     #     calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
     # elif esm_model == 'ESM-C_600M':
     #     calc_seq_esm_C_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
     
-    # # Extract esm feature of pocket nodes
+    # Extract esm feature of pocket nodes
     # get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
     
     # # Extract pocket information if you don't specify the pocket directory
@@ -526,7 +530,7 @@ def main():
     #     if not os.path.exists(pocket_info_save_path):
     #         get_pocket_info_batch_new(args.pocket_dir, pocket_info_save_path)
     
-    # # Make sure the number of nodes of pocket is the same between GVP and ESM feature
+    # Make sure the number of nodes of pocket is the same between GVP and ESM feature
     # check_pocket_feature(gvp_feat_path, esm_pocket_node_feature_path, log_dir=os.path.dirname(args.data_path))
     
     print('\n ###### Feature calculation is finished! ######\n')
