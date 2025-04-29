@@ -5,20 +5,21 @@
 ## Environment 
 ```
 conda create -n enzymecage python=3.10
-
+conda install -c conda-forge -c bioconda mmseqs2=15.6f452 -y
+pip install torch==2.1.0 torch-geometric==2.5.3 torch-scatter==2.1.2 torch-cluster==1.6.3 -f https://download.pytorch.org/whl/cu121/torch_stable.html
 pip install pyyaml==6.0
 pip install tqdm==4.66.2
 pip install numpy==1.24.3
 pip install pandas==1.4.2
 pip install ase==3.22.1
 pip install rdkit-pypi==2022.9.5
-pip install fair-esm==2.0.0
+pip install esm==3.1.1
 pip install biopython==1.83
 pip install drfp==0.3.6
 pip install mlcrate==0.2.0
 pip install rxn-chem-utils==1.5.0
-pip install torch==2.1.0 torch-geometric==2.5.3 torch-scatter==2.1.2 torch-cluster==1.6.3 -f https://download.pytorch.org/whl/cu122/torch_stable.html
-pip install transformers==4.14.1
+
+pip install transformers==4.46.3
 
 ```
 
@@ -30,7 +31,7 @@ pip install transformers==4.14.1
 * Evaluate the performance of the model
 
 ## Dataset
-We are still preparing the updated data, which is expected to be released before April 15.
+We are still preparing the updated data, which is expected to be released before May 6.
 
 ### Option 1: Directly use the extracted pockets
 We have run AlphaFill and pre-extracted the enzyme pockets from the dataset, and you can directly use this part of the data to reproduce the experimental results. The pockets are located in `./dataset/pocket/alphafill_8A`
@@ -111,7 +112,7 @@ python main.py \
 
 
 ## Retrieve & Inference
-The evaluation processes for Loyal-1968 and Orphan-194 differ slightly. For the Loyal-1968 test set, candidate enzymes have already been assigned to each reaction, allowing us to directly use the trained model to predict the catalytic scores. In contrast, for the Orphan-194 test set, we must first retrieve candidate enzymes for each reaction before using the trained model to predict the catalytic scores. Pretrained models are [here](https://zenodo.org/records/14613420).
+The evaluation processes for Loyal-1968 and Orphan-194 differ slightly. For the Loyal-1968 test set, candidate enzymes have already been assigned to each reaction, allowing us to directly use the trained model to predict the catalytic scores. In contrast, for the Orphan-194 test set, we must first retrieve candidate enzymes for each reaction before using the trained model to predict the catalytic scores. <!-- Pretrained models are [here](https://zenodo.org/records/14613420). -->
 
 Retrieve candidate enzymes to orphan reactions:
 ```shell
