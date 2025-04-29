@@ -9,9 +9,15 @@ from .base import BaseModel
 
 
 class Baseline(BaseModel):
-    def __init__(self, hidden_dims=[3328, 2048], device='cpu', sigmoid_readout=False):
+    def __init__(self, esm_model, hidden_dims=[3328, 2048], device='cpu', sigmoid_readout=False):
         super(Baseline, self).__init__()
-        # hidden_dim = 3328
+        
+        if esm_model == 'ESM-C_600M':
+            self.esm_dim = 1152
+        elif esm_model == 'esm2_t33_650M_UR50D' or not esm_model:
+            self.esm_dim = 1280
+        hidden_dims[0] = self.esm_dim + 2048
+        
         self.mlp = nn.Sequential(
             nn.Linear(hidden_dims[0], hidden_dims[1]),
             nn.LeakyReLU(),

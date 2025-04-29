@@ -6,7 +6,7 @@ from tqdm import tqdm
 from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score
 
 
-UID_COL = 'uniprotID'
+UID_COL = 'UniprotID'
 SEQ_COL = 'sequence'
 RXN_COL = 'CANO_RXN_SMILES'
 

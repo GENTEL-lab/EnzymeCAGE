@@ -122,6 +122,7 @@ class EnzymeCAGE(BaseModel):
         use_structure=True, 
         use_drfp=True, 
         use_prods_info=True, 
+        esm_model=None,
         interaction_method='geo-enhanced-interaction',
         rxn_inner_interaction=True,
         pocket_inner_interaction=True,
@@ -144,7 +145,13 @@ class EnzymeCAGE(BaseModel):
         self.model_device = device
         self.sigmoid_readout = sigmoid_readout
         self.dis_onehot_class = 16
-        self.esm_dim = 1280
+
+        if esm_model == 'ESM-C_600M':
+            self.esm_dim = 1152
+        elif esm_model == 'esm2_t33_650M_UR50D' or not esm_model:
+            self.esm_dim = 1280
+        else:
+            raise ValueError('Invalid ESM model name')
 
         in_feat_dim = 0
         if self.use_esm:

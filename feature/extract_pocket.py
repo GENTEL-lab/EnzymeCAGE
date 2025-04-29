@@ -416,7 +416,7 @@ def extract_fix_num_residues(input_path, pocket_save_dir=None, residue_num=32):
 
 def extract_pocket_by_resids(input_dir, save_dir, pocket_info_path):
     df_pocket_info = pd.read_csv(pocket_info_path)
-    uid2pocket = dict(zip(df_pocket_info['uniprotID'], df_pocket_info['pocket_residues']))
+    uid2pocket = dict(zip(df_pocket_info['UniprotID'], df_pocket_info['pocket_residues']))
     
     for uid, pocket_residues in tqdm(uid2pocket.items()):
         pdb_path = os.path.join(input_dir, f'{uid}.pdb')
@@ -480,6 +480,6 @@ def get_pocket_info_batch_new(input_dir, save_path):
     
     uid_list = [os.path.basename(pdb_file).split('.')[0] for pdb_file in pdb_files]
 
-    df_pocket_info = pd.DataFrame({'uniprotID': uid_list, 'pocket_residues': pocket_info_list})
+    df_pocket_info = pd.DataFrame({'UniprotID': uid_list, 'pocket_residues': pocket_info_list})
     df_pocket_info.to_csv(save_path, index=False)
     print(f'\nSave pocket info to {save_path}\n')
