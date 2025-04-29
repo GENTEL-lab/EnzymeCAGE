@@ -4,7 +4,7 @@
 
 ## Environment 
 ```
-conda create -n enzymecage python=3.8
+conda create -n enzymecage python=3.10
 
 pip install pyyaml==6.0
 pip install tqdm==4.66.2

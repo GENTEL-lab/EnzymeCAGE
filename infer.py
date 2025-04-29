@@ -81,20 +81,15 @@ def inference(model_conf):
 
     print(f'len(infer_dataset): {len(infer_dataset)}')
     test_loader = DataLoader(infer_dataset, batch_size=model_conf.batch_size, shuffle=False, follow_batch=follow_batch)
-        
 
-    if model_conf.predict_mode == 'only_best':
-        model_name_list = ['best_model.pth']
-    elif model_conf.predict_mode == 'all':
-        model_name_list = [f'epoch_{i}.pth' for i in range(20)]
-    else:
-        assert False, 'predict_mode must be only_best or all'
-        
+    model_name_list = model_conf.model_list
+
     assert os.path.exists(model_conf.ckpt_dir), f'Model checkpoints dir not found: {model_conf.ckpt_dir}'
     
     for model_name in tqdm(model_name_list):
         ckpt_path = os.path.join(model_conf.ckpt_dir, model_name)
         if not os.path.exists(ckpt_path):
+            print(f'Checkpoint file not found: {ckpt_path}')
             continue
         best_state_dict = torch.load(ckpt_path)
         model.load_state_dict(best_state_dict)

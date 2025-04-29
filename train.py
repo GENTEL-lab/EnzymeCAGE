@@ -61,63 +61,45 @@ def calculate_loss(loss_func, pred, target, batch_data):
 def main(model_conf):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    if model_conf.model == 'EnzymeCAGE':
-        follow_batch = ['protein', 'reaction_feature', 'esm_feature', 'substrates', 'products']
-        esm_model = None
-        if hasattr(model_conf, 'esm_model'):
-            esm_model = model_conf.esm_model
-        model = EnzymeCAGE(
-            use_esm=model_conf.use_esm,
-            use_structure=model_conf.use_structure,
-            use_drfp=model_conf.use_drfp,
-            use_prods_info=model_conf.use_prods_info,
-            esm_model=esm_model,
-            interaction_method=model_conf.interaction_method,
-            rxn_inner_interaction=model_conf.rxn_inner_interaction,
-            pocket_inner_interaction=model_conf.pocket_inner_interaction,
-            device=device
-        )
-        
-        if hasattr(model_conf, 'pretrain_model') and model_conf.pretrain_model:
-            if os.path.exists(model_conf.pretrain_model):
-                pretrain_model = torch.load(model_conf.pretrain_model, map_location=device)
-                model.load_state_dict(pretrain_model)
-                print(f'Load pretrained model from {model_conf.pretrain_model}')
-            else:
-                raise FileNotFoundError(f'Pretrain model not found: {model.pretrain_model}')
-        
-        print('Model save dir: ', model_conf.ckpt_dir)
-
-        weight_col = model_conf.weight_col if hasattr(model_conf, 'weight_col') else None
-        print(f'Sample weight column: {weight_col}')
-        
-        train_set, valid_set, test_set = create_geometric_dataset(train_path=model_conf.train_path,
-                                                                  valid_path=model_conf.valid_path,
-                                                                  test_path=model_conf.test_path,
-                                                                  protein_gvp_feat=model_conf.protein_gvp_feat, 
-                                                                  rxn_fp_path=model_conf.rxn_fp, 
-                                                                  mol_sdf_dir=model_conf.mol_conformation, 
-                                                                  esm_node_feature_path=model_conf.esm_node_feature, 
-                                                                  esm_mean_feature_path=model_conf.esm_mean_feature, 
-                                                                  reaction_center_path=model_conf.reaction_center,
-                                                                  weight_col=weight_col)
+    follow_batch = ['protein', 'reaction_feature', 'esm_feature', 'substrates', 'products']
+    esm_model = None
+    if hasattr(model_conf, 'esm_model'):
+        esm_model = model_conf.esm_model
+    model = EnzymeCAGE(
+        use_esm=model_conf.use_esm,
+        use_structure=model_conf.use_structure,
+        use_drfp=model_conf.use_drfp,
+        use_prods_info=model_conf.use_prods_info,
+        esm_model=esm_model,
+        interaction_method=model_conf.interaction_method,
+        rxn_inner_interaction=model_conf.rxn_inner_interaction,
+        pocket_inner_interaction=model_conf.pocket_inner_interaction,
+        device=device
+    )
     
-    elif model_conf.model == 'baseline':        
-        follow_batch = ['reaction_feature', 'esm_feature']
-        esm_model = None
-        if hasattr(model_conf, 'esm_model'):
-            esm_model = model_conf.esm_model
-        model = Baseline(device=device, esm_model=esm_model)
-        print('Model save dir: ', model_conf.ckpt_dir)
-        train_set, valid_set, test_set = create_baseline_dataset(train_path=model_conf.train_path,
-                                                                 valid_path=model_conf.valid_path,
-                                                                 test_path=model_conf.test_path,
-                                                                 rxn_fp_path=model_conf.rxn_fp,
-                                                                 esm_mean_feature_path=model_conf.esm_mean_feature)
-        
-    else:
-        raise ValueError('model type is not supported: {model_conf.model}')
+    if hasattr(model_conf, 'pretrain_model') and model_conf.pretrain_model:
+        if os.path.exists(model_conf.pretrain_model):
+            pretrain_model = torch.load(model_conf.pretrain_model, map_location=device)
+            model.load_state_dict(pretrain_model)
+            print(f'Load pretrained model from {model_conf.pretrain_model}')
+        else:
+            raise FileNotFoundError(f'Pretrain model not found: {model.pretrain_model}')
+    
+    print('Model save dir: ', model_conf.ckpt_dir)
 
+    weight_col = model_conf.weight_col if hasattr(model_conf, 'weight_col') else None
+    print(f'Sample weight column: {weight_col}')
+    
+    train_set, valid_set, test_set = create_geometric_dataset(train_path=model_conf.train_path,
+                                                                valid_path=model_conf.valid_path,
+                                                                test_path=model_conf.test_path,
+                                                                protein_gvp_feat=model_conf.protein_gvp_feat, 
+                                                                rxn_fp_path=model_conf.rxn_fp, 
+                                                                mol_sdf_dir=model_conf.mol_conformation, 
+                                                                esm_node_feature_path=model_conf.esm_node_feature, 
+                                                                esm_mean_feature_path=model_conf.esm_mean_feature, 
+                                                                reaction_center_path=model_conf.reaction_center,
+                                                                weight_col=weight_col)
     
     test_loader = DataLoader(test_set, batch_size=model_conf.batch_size, shuffle=False, follow_batch=follow_batch)
     valid_loader = DataLoader(valid_set, batch_size=model_conf.batch_size, shuffle=False, follow_batch=follow_batch)
@@ -226,10 +208,6 @@ def main(model_conf):
     df_valid = valid_set.df_data
     df_valid['pred'] = valid_preds.cpu()
     df_valid.to_csv(os.path.join(model_conf.ckpt_dir, f"valid_result.csv"), index=False)
-    
-    print()
-    print(df_valid.loc[0, 'pred'])
-    print()
 
 
 if __name__ == "__main__":
