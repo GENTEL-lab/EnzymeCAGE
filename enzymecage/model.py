@@ -145,7 +145,7 @@ class EnzymeCAGE(BaseModel):
         self.model_device = device
         self.sigmoid_readout = sigmoid_readout
         self.dis_onehot_class = 16
-        
+
         if esm_model == 'ESM-C_600M':
             self.esm_dim = 1152
         elif esm_model == 'esm2_t33_650M_UR50D' or not esm_model:

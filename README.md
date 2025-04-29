@@ -30,7 +30,6 @@ pip install transformers==4.14.1
 * Evaluate the performance of the model
 
 ## Dataset
-<!-- First, download the [dataset](https://zenodo.org/records/14613354) and extract it to the current directory. -->
 We are still preparing the updated data, which is expected to be released before April 15.
 
 ### Option 1: Directly use the extracted pockets
