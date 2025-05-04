@@ -31,7 +31,7 @@ pip install transformers==4.46.3
 * Evaluate the performance of the model
 
 ## Dataset
-We are still preparing the updated data, which is expected to be released before May 8 (holiday is on the way!).
+We are still preparing the updated data, which is expected to be released before May 10.
 
 ### Option 1: Directly use the extracted pockets
 We have run AlphaFill and pre-extracted the enzyme pockets from the dataset, and you can directly use this part of the data to reproduce the experimental results. The pockets are located in `./dataset/pocket/alphafill_8A`
