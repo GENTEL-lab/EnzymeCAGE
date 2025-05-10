@@ -8,6 +8,16 @@ from retrieve import init_mapping_info
 from enzymecage.base import UID_COL
 
 
+def filter_duplicates(df_data):
+    rxn_col = 'CANO_RXN_SMILES' if 'CANO_RXN_SMILES' in df_data.columns else 'reaction'
+    df_list = []
+    for rxn, df in df_data.groupby(rxn_col):
+        df = df.drop_duplicates(UID_COL)
+        df_list.append(df)
+    df_data = pd.concat(df_list).reset_index(drop=True)
+    return df_data
+
+
 def eval_top_rank_result(df_test_inference: pd.DataFrame, test_rxns: list, pred_col='pred', true_enz_dict=None, top_percent=None, to_print=True):
     """Evaluate the ranking result. 
 
@@ -144,6 +154,7 @@ def main():
     assert os.path.exists(args.result_path), f'result path not exists: {args.result_path}'
     assert os.path.exists(args.pos_pair_db_path), f'positive pair db path not exists: {args.pos_pair_db_path}'
     df_pred = pd.read_csv(args.result_path)
+    df_pred = filter_duplicates(df_pred)
     df_pos_pairs = pd.read_csv(args.pos_pair_db_path)
     
     _, rxn_to_uid = init_mapping_info(df_pos_pairs)

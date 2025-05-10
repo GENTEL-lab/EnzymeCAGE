@@ -18,34 +18,9 @@ from Bio import PDB
 
 from enzymecage.base import UID_COL, RXN_COL, SEQ_COL
 from utils import check_dir, cano_rxn, tranverse_folder
-# from gvp_torchdrug_feature import calc_gvp_feature
+from gvp_torchdrug_feature import calc_gvp_feature
 from extract_pocket import get_pocket_info, extract_fix_num_residues, get_pocket_info_batch_new
 from extract_reacting_center import extract_reacting_center, calc_aam
-
-
-def calc_morgan_fp(data_path, save_path, append=True):
-    print('\n', '#' * 20, 'Calculating morgan fp', '#' * 20, '\n')
-    df_data = pd.read_csv(data_path)
-    rxn_list = list(set(df_data[RXN_COL]))
-
-    if os.path.exists(save_path) and append:
-        rxn_to_fp = pkl.load(open(save_path, 'rb'))
-    else:
-        rxn_to_fp = {}
-        
-    for rxn in tqdm(rxn_list):
-        rcts, prods = rxn.split('>>')
-        mol_rcts = Chem.MolFromSmiles(rcts)
-        mol_prods = Chem.MolFromSmiles(prods)
-        rcts_fp = np.array(AllChem.GetMorganFingerprintAsBitVect(mol_rcts, radius=2, nBits=1024))
-        prods_fp = np.array(AllChem.GetMorganFingerprintAsBitVect(mol_prods, radius=2, nBits=1024))
-        rxnfp = np.concatenate([rcts_fp, prods_fp])
-        rxn_to_fp[rxn] = rxnfp
-    print(f'Number of reactions: {len(rxn_to_fp)}')
-    
-    check_dir(os.path.dirname(save_path))
-    pkl.dump(rxn_to_fp, open(save_path, 'wb'))
-    print(f'Save morgan fp to {save_path}')
 
 
 def calc_drfp(data_path, save_path, append=True):
@@ -442,25 +417,21 @@ def calc_reacting_center(data_path, save_dir, append=True):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, required=True)
-    parser.add_argument('--alphafill_result_dir', type=str, default=None)
     parser.add_argument('--pocket_dir', type=str, help='If you already have pocket data, you can specify the directory here')
-    parser.add_argument('--skip_calc_mol_conformation', action='store_true')
+    parser.add_argument('--skip_rxn_feature', action='store_true')
     args = parser.parse_args()
     
-    # alphafill_result_dir = os.path.join(os.path.dirname(args.data_path), 'alphafill_results')
-    alphafill_result_dir = args.alphafill_result_dir
-    # if not os.path.exists(alphafill_result_dir):
-    #     raise FileNotFoundError(f'alphafill result not found in {alphafill_result_dir}')
+    if args.pocket_dir.endswith('/'):
+        # remove '/' in the end of the path
+        args.pocket_dir = args.pocket_dir[:-1]
     
     if not args.pocket_dir:
         pocket_dir = os.path.join(os.path.dirname(args.data_path), 'pocket/alphafill_8A')
     else:
         pocket_dir = args.pocket_dir
         
-    # feature_dir = os.path.join(os.path.dirname(args.data_path), 'feature')
-    # feature_dir = '/home/liuy/data/SynBio/Terpene/feature'
-    feature_dir = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature'
-    
+    feature_dir = os.path.join(os.path.dirname(args.data_path), 'feature')
+
     # esm_model = 'esm2_t33_650M_UR50D'
     esm_model = 'ESM-C_600M'
     
@@ -472,66 +443,42 @@ def main():
     pocket_info_save_path = os.path.join(os.path.dirname(pocket_dir), 'pocket_info.csv')
     
     reaction_feat_dir = os.path.join(feature_dir, 'reaction')
-    morgan_save_path = os.path.join(reaction_feat_dir, 'morgan_fp/rxn2fp.pkl')
     drfp_save_path = os.path.join(reaction_feat_dir, 'drfp/rxn2fp.pkl')
     mol_conformation_dir = os.path.join(reaction_feat_dir, 'molecule_conformation')
     reacting_center_dir = os.path.join(reaction_feat_dir, 'reacting_center')
-    
-    # drfp_save_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/reaction/drfp/rxn2fp.pkl'
-    # morgan_save_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/reaction/morgan_fp/rxn2fp.pkl'
-    # reacting_center_dir = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/reaction/reacting_center/'
-    
 
-    # os.makedirs(pocket_dir, exist_ok=True)
+    os.makedirs(pocket_dir, exist_ok=True)
     os.makedirs(esm_node_feat_dir, exist_ok=True)
     os.makedirs(os.path.dirname(esm_mean_feat_path), exist_ok=True)
     os.makedirs(os.path.dirname(esm_pocket_node_feature_path), exist_ok=True)
     os.makedirs(os.path.dirname(gvp_feat_path), exist_ok=True)
-    os.makedirs(os.path.dirname(morgan_save_path), exist_ok=True)
     os.makedirs(os.path.dirname(drfp_save_path), exist_ok=True)
     os.makedirs(mol_conformation_dir, exist_ok=True)
     os.makedirs(reacting_center_dir, exist_ok=True)
     
-    # Calculate reaction fingerprints
-    calc_morgan_fp(args.data_path, morgan_save_path)
-    calc_drfp(args.data_path, drfp_save_path)
+    if not args.skip_rxn_feature:
+        # Calculate reaction fingerprints
+        calc_drfp(args.data_path, drfp_save_path)
+        
+        # Extract reaction center
+        calc_reacting_center(args.data_path, reacting_center_dir)
     
-    # # # Extract reaction center
-    calc_reacting_center(args.data_path, reacting_center_dir)
+        # May be the most time consuming step
+        # Generate molecular conformation by rdkit
+        generate_mol_conformation(args.data_path, mol_conformation_dir)
     
-    # if not args.skip_calc_mol_conformation:
-    #     # May be the most time consuming step
-    #     # Generate molecular conformation by rdkit
-    #     generate_mol_conformation(args.data_path, mol_conformation_dir)
-    
-    # return
-    
-    # gvp_feat_path = '/home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/gvp_feature/gvp_protein_feature_mix-af-p2rank.pt'
-    
+
     # Calculate GVP features of pockets
-    # calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
-    
-    # return
-    
+    calc_gvp_feature(args.data_path, pocket_dir, gvp_feat_path)
+        
     # Calculate ESM features of the full sequence
-    # if esm_model == 'esm2_t33_650M_UR50D':
-    #     calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
-    # elif esm_model == 'ESM-C_600M':
-    #     calc_seq_esm_C_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
+    if esm_model == 'esm2_t33_650M_UR50D':
+        calc_seq_esm_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
+    elif esm_model == 'ESM-C_600M':
+        calc_seq_esm_C_feature(args.data_path, esm_node_feat_dir, esm_mean_feat_path)
     
     # Extract esm feature of pocket nodes
-    # get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
-    
-    # # Extract pocket information if you don't specify the pocket directory
-    # if not args.pocket_dir:
-    #     # Note: make sure the result file of alphafill ends with '_transplant.cif'
-    #     get_pocket_info_batch(alphafill_result_dir, pocket_info_save_path, pocket_dir)
-    # else:
-    #     if not os.path.exists(pocket_info_save_path):
-    #         get_pocket_info_batch_new(args.pocket_dir, pocket_info_save_path)
-    
-    # Make sure the number of nodes of pocket is the same between GVP and ESM feature
-    # check_pocket_feature(gvp_feat_path, esm_pocket_node_feature_path, log_dir=os.path.dirname(args.data_path))
+    get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
     
     print('\n ###### Feature calculation is finished! ######\n')
     
