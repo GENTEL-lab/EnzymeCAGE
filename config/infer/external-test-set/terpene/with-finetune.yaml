@@ -1,0 +1,22 @@
+model: 'EnzymeCAGE'
+interaction_method: 'geo-enhanced-interaction'
+rxn_inner_interaction: True
+pocket_inner_interaction: True
+use_prods_info: False
+use_structure: True
+use_drfp: True
+use_esm: True
+esm_model: ESM-C_600M
+batch_size: 256
+model_list: ['epoch_9.pth']
+
+data_path: ./dataset/external-test-set/terpene/test_Terpene.csv
+ckpt_dir: ./checkpoints/domain-specific-ft/terpene/seed_42/
+
+### general feature path 
+rxn_fp: dataset/external-test-set/terpene/feature/reaction/drfp/rxn2fp.pkl
+mol_conformation: dataset/external-test-set/terpene/feature/reaction/molecule_conformation
+reaction_center: dataset/external-test-set/terpene/feature/reaction/reacting_center/reacting_center.pkl
+protein_gvp_feat: dataset/external-test-set/terpene/feature/protein/gvp_feature/gvp_protein_feature.pt
+esm_mean_feature: dataset/external-test-set/terpene/feature/protein/ESM-C_600M/protein_level/seq2feature.pkl
+esm_node_feature: dataset/external-test-set/terpene/feature/protein/ESM-C_600M/pocket_node_feature/esm_node_feature.pt

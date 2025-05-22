@@ -46,6 +46,21 @@ python infer.py --config config/infer/Orphan-335.yaml
 python evaluate.py --result_path ./checkpoints/pretrain/seed_42/Orphan-335_retrievel_cands_epoch_19.csv
 ```
 
+### External test sets
+
+```shell
+# Generate feature for external test sets
+sh shells/calc_feature_for-ext.sh
+
+# Evaluation on P450 test set
+sh shells/evaluate_p450.sh
+
+# Evaluation on Terpene synthase test set
+sh shells/evaluate_terpene.sh
+
+# Evaluation on Phosphatase test set
+sh shells/evaluate_phosphatase.sh
+```
 
 ## License
 No commercial use of the model or data; see LICENSE for details.

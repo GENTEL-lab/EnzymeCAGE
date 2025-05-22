@@ -354,7 +354,7 @@ def get_esm_pocket_feature(pocket_info_path, esm_node_feat_dir, save_path):
     print(f'Save esm feature of {len(uid_to_pocket_node_feature)} pockets to {save_path}\n')
 
 
-def check_pocket_feature(gvp_feature_path, esm_feature_path, log_dir=None):
+def check_pocket_feature(gvp_feature_path, esm_feature_path):
     gvp_feature = torch.load(gvp_feature_path)
     esm_feature = torch.load(esm_feature_path)
     
@@ -367,14 +367,13 @@ def check_pocket_feature(gvp_feature_path, esm_feature_path, log_dir=None):
         if n_gvp_nodes != n_esm_nodes:
             bad_proteins.append(uid)
     
-    df_bad_pros = pd.DataFrame({UID_COL: bad_proteins})
+    if len(bad_proteins) > 0:
+        print(f"Found {len(bad_proteins)} bad proteins, which have different node numbers between gvp and esm features. These proteins should be removed from training data!")
+        gvp_feature = {uid: val for uid, val in gvp_feature.items() if uid not in bad_proteins}
+        esm_feature = {uid: val for uid, val in esm_feature.items() if uid not in bad_proteins}
+        torch.save(gvp_feature, gvp_feature_path)
+        torch.save(esm_feature, esm_feature_path)
     
-    if len(df_bad_pros) > 0 and log_dir:
-        print(f"Found {len(df_bad_pros)} bad proteins, which have different node numbers between gvp and esm features. These proteins should be removed from training data!")
-        save_path = os.path.join(log_dir, 'bad_proteins.csv')
-        df_bad_pros.to_csv(save_path, index=False)
-        print(f"Save bad proteins to {save_path}\n")
-
 
 def delete_empty(data_dir):
     file_list = tranverse_folder(data_dir)
@@ -479,6 +478,8 @@ def main():
     
     # Extract esm feature of pocket nodes
     get_esm_pocket_feature(pocket_info_save_path, esm_node_feat_dir, esm_pocket_node_feature_path)
+    
+    check_pocket_feature(gvp_feat_path, esm_pocket_node_feature_path)
     
     print('\n ###### Feature calculation is finished! ######\n')
     
