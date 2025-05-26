@@ -1,0 +1,26 @@
+model: 'EnzymeCAGE'
+interaction_method: 'geo-enhanced-interaction'
+rxn_inner_interaction: True
+pocket_inner_interaction: True
+use_prods_info: False
+use_structure: True
+use_drfp: True
+use_esm: True
+esm_model: ESM-C_600M
+batch_size: 256
+# predict_mode: 'only_best'
+model_list: ['epoch_19.pth']
+
+data_path: ./dataset/case-study/glutarate/rxns_retrievel_cands.csv
+ckpt_dir: ./checkpoints/pretrain/seed_42/
+
+### general feature path 
+rxn_fp: dataset/RHEA/2025-02-05/feature/reaction/drfp/rxn2fp.pkl
+mol_conformation: dataset/RHEA/2025-02-05/feature/reaction/molecule_conformation
+reaction_center: dataset/RHEA/2025-02-05/feature/reaction/reacting_center/reacting_center.pkl
+# protein_gvp_feat: dataset/RHEA/2025-02-05/feature/protein/gvp_feature/gvp_protein_feature.pt
+# esm_mean_feature: dataset/RHEA/2025-02-05/feature/protein/ESMC_600M/protein_level/seq2feature.pkl
+# esm_node_feature: dataset/RHEA/2025-02-05/feature/protein/protein/ESMC_600M/pocket_node_feature/esm_node_feature.pt
+protein_gvp_feat: /home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/gvp_feature/gvp_protein_feature_mix-af-p2rank.pt
+esm_mean_feature: /home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/ESM-C_600M/protein_level/seq2feature.pkl
+esm_node_feature: /home/liuy/data/RHEA/previous_versions/2025-02-05/processed/feature/protein/ESM-C_600M/pocket_node_feature/esm_node_feature_mix-af-p2rank.pt

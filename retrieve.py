@@ -214,8 +214,8 @@ def run_retrieval(df_data, df_db, smiles_col, uid_to_proevi, uid_to_taxdis, topk
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, required=True)
-    parser.add_argument('--exclude_rxns', type=str, default='./dataset/orphan-rxns/rxns_exclude_in_retrieval.csv')
-    parser.add_argument('--db_path', type=str, default='./dataset/db/enzyme-reaction-pairs.csv')
+    parser.add_argument('--exclude_rxns', type=str, default='')
+    parser.add_argument('--db_path', type=str, required=True)
     parser.add_argument('--smiles_col', type=str, default='CANO_RXN_SMILES', help='column name of reaction SMILES in the data')
     parser.add_argument('--proevi_path', type=str, default='./dataset/others/uid_to_proevi.pkl')
     parser.add_argument('--taxdis_path', type=str, default='./dataset/others/uid_to_taxdis.pkl')

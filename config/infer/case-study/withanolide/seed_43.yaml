@@ -1,0 +1,22 @@
+model: 'EnzymeCAGE'
+interaction_method: 'geo-enhanced-interaction'
+rxn_inner_interaction: True
+pocket_inner_interaction: True
+use_prods_info: False
+use_structure: True
+use_drfp: True
+use_esm: True
+esm_model: ESM-C_600M
+batch_size: 256
+model_list: ['epoch_19.pth']
+
+data_path: ./dataset/case-study/withanolide/data.csv
+ckpt_dir: ./checkpoints/pretrain/seed_43/
+
+### general feature path 
+rxn_fp: dataset/case-study/withanolide/feature/reaction/drfp/rxn2fp.pkl
+mol_conformation: dataset/case-study/withanolide/feature/reaction/molecule_conformation
+reaction_center: dataset/case-study/withanolide/feature/reaction/reacting_center/reacting_center.pkl
+protein_gvp_feat: dataset/case-study/withanolide/feature/protein/gvp_feature/gvp_protein_feature.pt
+esm_mean_feature: dataset/case-study/withanolide/feature/protein/ESM-C_600M/protein_level/seq2feature.pkl
+esm_node_feature: dataset/case-study/withanolide/feature/protein/ESM-C_600M/pocket_node_feature/esm_node_feature.pt

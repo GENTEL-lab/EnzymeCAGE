@@ -114,7 +114,7 @@ def init_pos_pairs(df_test):
     return rxn2uid
 
 
-def evaluate(test_data_path, train_fasta_path, pred_result_path):
+def evaluate_external_test(pred_result_path, test_data_path, train_fasta_path):
     df_test = pd.read_csv(test_data_path)
     corr_score_path = os.path.join(os.path.dirname(test_data_path), 'corr_score_map.pkl')
     if not os.path.exists(corr_score_path):
@@ -160,11 +160,82 @@ def evaluate(test_data_path, train_fasta_path, pred_result_path):
     print('#' * 40)
 
 
+def load_ensemble_result(pred_result_path):
+    df_pred = pd.read_csv(pred_result_path)
+    all_paths = pred_result_path.split('/')
+    filename = all_paths[-1]
+    seed_dir = all_paths[-2]
+    assert seed_dir.startswith('seed_')
+    
+    df_pred['pred_ensemble'] = 0
+    for i in range(40, 45):
+        seed_dir = f'seed_{i}'
+        path = '/'.join(all_paths[:-2] + [seed_dir, filename])
+        df = pd.read_csv(path)
+        df_pred[f'pred_ensemble'] += df['pred'].values / 5
+    
+    return df_pred
+    
+
+def evaluate_withanolide(pred_result_path, test_data_path, train_fasta_path):
+    df_test = pd.read_csv(test_data_path)
+    corr_score_path = os.path.join(os.path.dirname(test_data_path), 'corr_score_map.pkl')
+    if not os.path.exists(corr_score_path):
+        # Search homologs for protein in the test dataset
+        mmseqs_result_path = run_mmseqs(test_data_path, train_fasta_path)
+        
+        # Prepare some necessary data mappings
+        uid_to_similar, seq_idt_map, rxn_simi_map = prepare_for_corr_score(test_data_path, mmseqs_result_path)
+        
+        # Add a correlation score list to test dataframe to get the candidates
+        df_test = calc_correlation_score(df_test, uid_to_similar, seq_idt_map, rxn_simi_map)
+        
+        df_test['key'] = df_test['CANO_RXN_SMILES']  + '_' + df_test['UniprotID']
+        corr_score_map = dict(zip(df_test['key'], df_test['corr_score']))
+        
+        with open(corr_score_path, 'wb') as f:
+            pkl.dump(corr_score_map, f)
+    else:
+        corr_score_map = pkl.load(open(corr_score_path, 'rb'))
+    
+    # Load prediction result and ensemble
+    df_pred = load_ensemble_result(pred_result_path)
+    df_pred['key'] = df_pred['CANO_RXN_SMILES'] + '_' + df_pred['UniprotID']
+    df_pred['corr_score'] = df_pred['key'].map(corr_score_map)
+    df_pred['pred_mix'] = df_pred['pred_ensemble'] * df_pred['corr_score']
+    
+    id2name = {
+        'enzyme_11': 'CYP87G1',
+        'enzyme_84': 'CYP88C7',
+        'enzyme_64': 'CYP749B2'
+    }
+    
+    print()
+    print('#' * 10, 'Evaluation of withanolide biosynthesis', '#' * 10, '\n')
+    for i, (_, df) in enumerate(df_pred.groupby('CANO_RXN_SMILES')):
+        df = df.drop_duplicates('sequence')
+        df = df.sort_values('pred_mix', ascending=False).reset_index(drop=True)
+        df_pos = df[df['Label'] == 1]
+        best_rank = df_pos.index[0]
+        pos_enzyme = df_pos['UniprotID'].values[0]
+        
+        print(f'Reaction step: {i+1}, Best positive enzyme rank: {best_rank} ({id2name[pos_enzyme]})')
+    
+    print()
+    print('#' * 60, '\n')
+    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pred_result_path', type=str, required=True)
     parser.add_argument('--test_data_path', type=str, required=True)
     parser.add_argument('--train_fasta_path', type=str, default='../dataset/RHEA/2023-07-12/enzymes.fasta')
+    parser.add_argument('--data_type', type=str, default='external-test')
     args = parser.parse_args()
     
-    evaluate(args.test_data_path, args.train_fasta_path, args.pred_result_path)
+    if args.data_type == 'external-test':
+        evaluate_external_test(args.pred_result_path, args.test_data_path, args.train_fasta_path)
+    elif args.data_type == 'withanolide':
+        evaluate_withanolide(args.pred_result_path, args.test_data_path, args.train_fasta_path)
+    else:
+        raise ValueError(f'Invalid data type: {args.data_type}')

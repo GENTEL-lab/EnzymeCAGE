@@ -62,6 +62,16 @@ sh shells/evaluate_terpene.sh
 sh shells/evaluate_phosphatase.sh
 ```
 
+### Glutarate & Withanolide biosynthesis
+```shell
+# Evaluation on Glutarate biosynthesis dataset
+sh shells/evaluate_glutarate.sh
+
+# Evaluation on Withanolide biosynthesis dataset
+sh shells/evaluate_withanolide.sh
+```
+
+
 ## License
 No commercial use of the model or data; see LICENSE for details.
 
