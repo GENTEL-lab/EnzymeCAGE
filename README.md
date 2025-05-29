@@ -8,7 +8,7 @@ sh setup_env.sh
 ```
 
 ## Dataset
-Please download the full dataset [here](https://drive.google.com/file/d/1u2lt4SqAvzoSHKqwzF1DbnPGXfegXYQ2/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
+Please download the full dataset [here](https://drive.google.com/file/d/1REquVhOpCDPmIuf3JGUsuS2O1zDT-yDl/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
 
 Place the downloaded `dataset.zip` and `checkpoints.zip` in the current folder, then unzip them. Next, calculate the protein feature (it is recommended to directly use the reaction feature provided in the data).
 
