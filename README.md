@@ -4,6 +4,8 @@
 
 ## Environment 
 ```shell
+conda create -n enzymecage python=3.10
+conda activate enzymecage
 sh setup_env.sh
 ```
 
@@ -17,10 +19,12 @@ cd feature
 python main.py --data_path ../dataset/RHEA/2025-02-05/all_enzymes.csv --pocket_dir ../dataset/RHEA/2025-02-05/pockets/pocket --skip_rxn_feature
 ```
 
+Data cleaning details can be found in the [here](./scripts/README.md).
+
 ## Evaluation
 We have run AlphaFill and pre-extracted the enzyme pockets from the dataset, and you can directly use this part of the data to reproduce the experimental results.
 
-We have updated the test set. The new version of the data includes two test sets: `Orphan-194` and `Enzyme-405`, which are used to evaluate the enzyme retrieval capability on orphan reactions and the functional prediction capability on novel enzymes, respectively.
+We have updated the test set. The new version of the data includes two test sets: `Orphan-335` and `Enzyme-405`, which are used to evaluate the enzyme retrieval capability on orphan reactions and the functional prediction capability on novel enzymes, respectively.
 
 ### Enzyme-405
 
