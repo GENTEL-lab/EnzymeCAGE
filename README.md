@@ -9,6 +9,13 @@ conda activate enzymecage
 sh setup_env.sh
 ```
 
+**Note**: The `setup_env.sh` script specifies a CUDA version when installing PyTorch and related dependencies. If the specified version does not match your server's CUDA version and the environment installation fails, please adjust accordingly. The following two PyTorch versions both work and are provided for reference:
+```shell
+pip install torch==2.2.0 torch-scatter torch-cluster torch-sparse torch-geometric torchvision -f https://data.pyg.org/whl/torch-2.2.0+cu121.html
+
+pip install torch==2.4.0 torch-scatter torch-cluster torch-sparse torch-geometric torchvision -f https://data.pyg.org/whl/torch-2.4.0+cu124.html
+```
+
 ## Dataset
 Please download the full dataset [here](https://drive.google.com/file/d/1REquVhOpCDPmIuf3JGUsuS2O1zDT-yDl/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
 
