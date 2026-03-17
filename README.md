@@ -54,7 +54,7 @@ python retrieve.py --data_path dataset/internal-test-set/Orphan-335/Orphan-335.c
 python infer.py --config config/infer/Orphan-335.yaml
 
 # Evaluation
-python evaluate.py --result_path ./checkpoints/pretrain/seed_42/Orphan-335_retrievel_cands_epoch_19.csv
+python evaluate.py --result_path ./checkpoints/pretrain/seed_42/Orphan-335_retrievel_cands_epoch_19.csv --pos_pair_db_path dataset/RHEA/2025-02-05/rhea_rxn2uids.csv
 ```
 
 ### External test sets
