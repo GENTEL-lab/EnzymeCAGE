@@ -89,11 +89,12 @@ No commercial use of the model or data; see LICENSE for details.
 ## Citation
 Please cite the following preprint when referencing EnzymeCAGE:
 ```
-@article{liu2024enzymecage,
-  title={EnzymeCAGE: A Geometric Foundation Model for Enzyme Retrieval with Evolutionary Insights},
-  author={Liu, Yong and Hua, Chenqing and Zeng, Tao and Rao, Jiahua and Zhang, Zhongyue and Wu, Ruibo and Coley, Connor W and Zheng, Shuangjia},
-  journal={bioRxiv},
-  year={2024},
-  publisher={Cold Spring Harbor Laboratory}
+@article{liu2026geometric,
+  title={A geometric foundation model for enzyme retrieval with evolutionary insights},
+  author={Liu, Yong and Hua, Chenqing and Xu, Menglong and Zeng, Tao and Rao, Jiahua and Zhang, Zhongyue and Wu, Ruibo and Weng, Jing-Ke and Coley, Connor W and Zheng, Shuangjia},
+  journal={Nature Catalysis},
+  pages={1--13},
+  year={2026},
+  publisher={Nature Publishing Group UK London}
 }
 ```
