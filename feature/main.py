@@ -341,7 +341,7 @@ def get_pocket_info_batch(
 
 def build_residue_mapping(pdb_file):
     """
-    从PDB文件建立残基编号到序列索引的映射
+    Build a mapping from PDB residue numbers to contiguous sequence indices.
 
     Returns:
         dict: {pdb_residue_number: sequence_index}
@@ -354,14 +354,14 @@ def build_residue_mapping(pdb_file):
 
     for model in structure:
         for chain in model:
-            # 只处理链A（蛋白质链）
+            # Only use chain A (protein chain)
             if chain.id != "A":
                 continue
             for residue in chain.get_residues():
-                # 只处理标准氨基酸残基
+                # Only keep standard amino-acid residues
                 hetero_flag = residue.id[0]
-                if hetero_flag == " ":  # 标准氨基酸
-                    pdb_res_num = residue.id[1]  # PDB中的残基编号
+                if hetero_flag == " ":  # standard amino-acid residue
+                    pdb_res_num = residue.id[1]  # residue number in PDB
                     residue_mapping[pdb_res_num] = seq_index
                     seq_index += 1
 
@@ -372,13 +372,15 @@ def get_esm_pocket_feature(
     pocket_info_path, esm_node_feat_dir, save_path, pocket_pdb_dir=None
 ):
     """
-    提取ESM pocket特征，修复了PDB残基编号与序列索引不匹配的问题
+    Extract ESM pocket features and fix mismatch between
+    PDB residue numbering and sequence indices.
 
     Args:
-        pocket_info_path: pocket信息CSV文件路径
-        esm_node_feat_dir: ESM node特征目录
-        save_path: 保存路径
-        pocket_pdb_dir: pocket PDB文件目录（可选，如果提供则使用残基映射）
+        pocket_info_path: Path to pocket info CSV
+        esm_node_feat_dir: Directory of ESM node features
+        save_path: Output path
+        pocket_pdb_dir: Pocket PDB directory (optional; if provided,
+            use residue-number mapping)
     """
     df_pocket_data = pd.read_csv(pocket_info_path)
     uids = [str(each) for each in df_pocket_data[UID_COL].values]
@@ -404,15 +406,15 @@ def get_esm_pocket_feature(
         if not isinstance(pocket_residue_ids, str):
             continue
 
-        # 如果提供了pocket_pdb_dir，使用残基映射来修复索引问题
+        # If pocket_pdb_dir is provided, use residue mapping
         if pocket_pdb_dir:
             pdb_file = os.path.join(pocket_pdb_dir, f"{uid}.pdb")
             if os.path.exists(pdb_file):
                 try:
-                    # 建立残基编号到序列索引的映射
+                    # Build residue-number to sequence-index mapping
                     residue_mapping = build_residue_mapping(pdb_file)
 
-                    # 将PDB残基编号转换为序列索引
+                    # Convert PDB residue numbers to sequence indices
                     pdb_res_numbers = [int(i) for i in pocket_residue_ids.split(",")]
                     seq_indices = []
 
@@ -423,15 +425,15 @@ def get_esm_pocket_feature(
                                 seq_indices.append(seq_idx)
                             else:
                                 print(
-                                    f"[Warning] UID: {uid} 序列索引 {seq_idx} 超出范围 {seq_length}. 已跳过该残基。"
+                                    f"[Warning] UID: {uid} sequence index {seq_idx} out of range {seq_length}. Skipped this residue."
                                 )
                         else:
-                            # PDB残基编号未找到映射，跳过
+                            # Skip residues without valid mapping
                             pass
 
                     if len(seq_indices) == 0:
                         print(
-                            f"[Warning] UID: {uid} 没有有效的残基索引. 已跳过该蛋白。"
+                            f"[Warning] UID: {uid} no valid residue indices found. Skipped this protein."
                         )
                         skipped_count += 1
                         continue
@@ -439,21 +441,21 @@ def get_esm_pocket_feature(
                     pocket_node_feature = esm_node_feature[seq_indices]
 
                 except Exception as e:
-                    print(f"[Warning] UID: {uid} 处理错误: {str(e)}. 已跳过该蛋白。")
+                    print(f"[Warning] UID: {uid} processing error: {str(e)}. Skipped this protein.")
                     skipped_count += 1
                     continue
             else:
-                # PDB文件不存在，跳过
+                # Skip if PDB file does not exist
                 skipped_count += 1
                 continue
         else:
-            # 使用旧方法（减1）- 可能导致索引越界
+            # Legacy mode (residue_id - 1), may cause out-of-range access
             pocket_residue_ids = [int(i) - 1 for i in pocket_residue_ids.split(",")]
             max_idx = max(pocket_residue_ids) if pocket_residue_ids else 0
 
             if max_idx >= seq_length:
                 print(
-                    f"[Warning] UID: {uid} 索引越界! 口袋最大索引: {max_idx + 1}, 特征长度: {seq_length}. 已跳过该蛋白。"
+                    f"[Warning] UID: {uid} index out of range! Pocket max index: {max_idx + 1}, feature length: {seq_length}. Skipped this protein."
                 )
                 skipped_count += 1
                 continue
