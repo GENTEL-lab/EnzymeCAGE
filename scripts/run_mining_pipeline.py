@@ -89,7 +89,6 @@ def main():
     input_csv = Path(args.input_csv).resolve() if args.input_csv else data_dir / 'mining.csv'
     pocket_root = data_dir / 'pocket' / 'p2rank'
     pocket_dir = pocket_root / 'pocket'
-    pocket_info_path = pocket_root / 'pocket_info.csv'
     result_dir = data_dir / 'predictions'
 
     if not args.skip_prepare_csv:
@@ -134,8 +133,6 @@ def main():
                 str(input_csv),
                 '--pocket_dir',
                 str(pocket_dir),
-                '--pocket_info_path',
-                str(pocket_info_path),
             ],
             cwd=ROOT_DIR / 'feature',
         )

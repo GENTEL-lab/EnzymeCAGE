@@ -139,19 +139,17 @@ def normalize_columns(df):
 
 def build_structure_mappings(structure_path):
     _, gvp_residues = get_structure_sequence_and_gvp_residues(str(structure_path))
-    chain_residue_to_position = {}
-    residue_label_to_positions = {}
-    position_to_residue = {}
+    chain_residue_to_residue = {}
+    residue_label_to_residues = {}
 
-    for position, residue in enumerate(gvp_residues, start=1):
+    for residue in gvp_residues:
         chain_id = residue.get_parent().id
         residue_label = format_residue_label(residue.id)
         key = (str(chain_id).strip(), residue_label)
-        chain_residue_to_position[key] = position
-        residue_label_to_positions.setdefault(residue_label, []).append(position)
-        position_to_residue[position] = residue
+        chain_residue_to_residue[key] = residue
+        residue_label_to_residues.setdefault(residue_label, []).append(residue)
 
-    return chain_residue_to_position, residue_label_to_positions, position_to_residue
+    return chain_residue_to_residue, residue_label_to_residues
 
 
 def format_residue_label(residue_id):
@@ -160,14 +158,14 @@ def format_residue_label(residue_id):
     return f'{residue_number}{insertion_code}'
 
 
-def resolve_position(chain_id, residue_label, chain_residue_to_position, residue_label_to_positions):
+def resolve_residue(chain_id, residue_label, chain_residue_to_residue, residue_label_to_residues):
     key = (chain_id, residue_label)
-    if key in chain_residue_to_position:
-        return chain_residue_to_position[key]
+    if key in chain_residue_to_residue:
+        return chain_residue_to_residue[key]
 
-    positions = residue_label_to_positions.get(residue_label, [])
-    if len(positions) == 1:
-        return positions[0]
+    residues = residue_label_to_residues.get(residue_label, [])
+    if len(residues) == 1:
+        return residues[0]
 
     raise KeyError(f'Unable to map residue {chain_id}:{residue_label} to a unique sequence position')
 
@@ -185,21 +183,28 @@ def load_pocket_positions(residue_csv_path, structure_path, pocket_rank):
     if pocket_rows.empty:
         raise ValueError(f'No residues assigned to pocket rank {pocket_rank} in {residue_csv_path}')
 
-    chain_residue_to_position, residue_label_to_positions, position_to_residue = build_structure_mappings(structure_path)
-    selected_positions = []
+    chain_residue_to_residue, residue_label_to_residues = build_structure_mappings(structure_path)
+    selected_residues = []
     for _, row in pocket_rows.iterrows():
         chain_id = str(row['chain']).strip()
         residue_label = str(row['residue_label']).strip()
-        selected_positions.append(
-            resolve_position(chain_id, residue_label, chain_residue_to_position, residue_label_to_positions)
+        selected_residues.append(
+            resolve_residue(chain_id, residue_label, chain_residue_to_residue, residue_label_to_residues)
         )
 
-    selected_positions = sorted(set(selected_positions))
-    selected_keys = {
-        (position_to_residue[position].get_parent().id, position_to_residue[position].id)
-        for position in selected_positions
-    }
-    return selected_positions, selected_keys
+    dedup_residues = []
+    seen_keys = set()
+    for residue in selected_residues:
+        residue_key = (residue.get_parent().id, residue.id)
+        if residue_key in seen_keys:
+            continue
+        seen_keys.add(residue_key)
+        dedup_residues.append(residue)
+
+    dedup_residues.sort(key=lambda residue: (residue.get_parent().id, residue.id[1], residue.id[2].strip()))
+    selected_keys = {(residue.get_parent().id, residue.id) for residue in dedup_residues}
+    pocket_residue_ids = [str(residue.id[1]) for residue in dedup_residues]
+    return pocket_residue_ids, selected_keys
 
 
 def load_prediction_metadata(prediction_csv_path, pocket_rank):
@@ -254,13 +259,13 @@ def extract_pockets(structure_files, raw_output_dir, output_dir, pocket_rank):
         try:
             residue_csv_path = resolve_prediction_file(prediction_dir, uid, '_residues.csv')
             prediction_csv_path = resolve_prediction_file(prediction_dir, uid, '_predictions.csv')
-            selected_positions, selected_keys = load_pocket_positions(residue_csv_path, structure_path, pocket_rank)
+            pocket_residue_ids, selected_keys = load_pocket_positions(residue_csv_path, structure_path, pocket_rank)
             pocket_path = pocket_dir / f'{uid}.pdb'
             save_pocket_structure(structure_path, selected_keys, pocket_path)
 
             row = {
                 'UniprotID': uid,
-                'pocket_residues': ','.join(str(position) for position in selected_positions),
+                'pocket_residues': ','.join(pocket_residue_ids),
                 'structure_path': str(structure_path),
                 'pocket_path': str(pocket_path.resolve()),
                 'pocket_rank': pocket_rank,

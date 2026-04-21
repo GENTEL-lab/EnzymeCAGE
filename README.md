@@ -57,7 +57,7 @@ python retrieve.py --data_path dataset/internal-test-set/Orphan-335/Orphan-335.c
 python infer.py --config config/infer/Orphan-335.yaml
 
 # Evaluation
-python evaluate.py --result_path ./checkpoints/pretrain/seed_42/Orphan-335_retrievel_cands_epoch_19.csv
+python evaluate.py --result_path ./checkpoints/pretrain/seed_42/Orphan-335_retrievel_cands_epoch_19.csv --pos_pair_db_path dataset/RHEA/2025-02-05/rhea_rxn2uids.csv
 ```
 
 ### External test sets
@@ -151,8 +151,7 @@ This step keeps the raw P2Rank output under `dataset/demo/pocket/p2rank/raw/`, e
 cd feature
 python main.py \
   --data_path ../dataset/demo/mining.csv \
-  --pocket_dir ../dataset/demo/pocket/p2rank/pocket \
-  --pocket_info_path ../dataset/demo/pocket/p2rank/pocket_info.csv
+  --pocket_dir ../dataset/demo/pocket/p2rank/pocket
 cd ..
 ```
 
@@ -190,11 +189,12 @@ No commercial use of the model or data; see LICENSE for details.
 ## Citation
 Please cite the following preprint when referencing EnzymeCAGE:
 ```
-@article{liu2024enzymecage,
-  title={EnzymeCAGE: A Geometric Foundation Model for Enzyme Retrieval with Evolutionary Insights},
-  author={Liu, Yong and Hua, Chenqing and Zeng, Tao and Rao, Jiahua and Zhang, Zhongyue and Wu, Ruibo and Coley, Connor W and Zheng, Shuangjia},
-  journal={bioRxiv},
-  year={2024},
-  publisher={Cold Spring Harbor Laboratory}
+@article{liu2026geometric,
+  title={A geometric foundation model for enzyme retrieval with evolutionary insights},
+  author={Liu, Yong and Hua, Chenqing and Xu, Menglong and Zeng, Tao and Rao, Jiahua and Zhang, Zhongyue and Wu, Ruibo and Weng, Jing-Ke and Coley, Connor W and Zheng, Shuangjia},
+  journal={Nature Catalysis},
+  pages={1--13},
+  year={2026},
+  publisher={Nature Publishing Group UK London}
 }
 ```

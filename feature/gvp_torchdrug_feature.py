@@ -79,6 +79,12 @@ def align_clean_residues_to_sequence(structure_path, target_sequence=None):
         end_idx = start_idx + len(target_sequence)
         return clean_residues[start_idx:end_idx], 'substring_match'
 
+    if len(clean_residues) < len(target_sequence):
+        # Pocket PDBs are residue subsets rather than full-length structures.
+        # In that case we use the prepared pocket directly instead of forcing
+        # alignment against the full protein sequence.
+        return clean_residues, 'pocket_subset_fallback'
+
     raise ValueError(
         f'Sequence mismatch between dataset ({len(target_sequence)}) and structure ({len(structure_sequence)})'
     )
