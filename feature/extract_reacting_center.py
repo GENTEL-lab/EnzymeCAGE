@@ -299,10 +299,6 @@ def get_rdkit_mol(mol):
 
 
 def calc_aam(data_path, save_dir, append=True, rerun=False):
-    
-    from localmapper import localmapper
-    mapper = localmapper(device='cpu')
-
     save_path = os.path.join(save_dir, 'rxn2aam.pkl')
     if os.path.exists(save_path) and append and not rerun:
         cached_rxn2aam = pkl.load(open(save_path, 'rb'))
@@ -312,8 +308,28 @@ def calc_aam(data_path, save_dir, append=True, rerun=False):
     df_data = pd.read_csv(data_path)
     rxns_to_run = df_data['CANO_RXN_SMILES'].unique()
     rxns_to_run = [rxn for rxn in rxns_to_run if rxn not in cached_rxn2aam]
-    
-    result_list = [mapper.get_atom_map(rxn) for rxn in tqdm(rxns_to_run)]
+
+    if not rxns_to_run:
+        with open(save_path, 'wb') as f:
+            pkl.dump(cached_rxn2aam, f)
+        return
+
+    mapper = None
+    use_localmapper = False
+    try:
+        from localmapper import localmapper
+        mapper = localmapper(device='cpu')
+        use_localmapper = True
+    except Exception as exc:
+        print(f'localmapper is unavailable, fallback to BatchedMapper: {exc}')
+
+    if use_localmapper:
+        result_list = [mapper.get_atom_map(rxn) for rxn in tqdm(rxns_to_run)]
+    else:
+        rxn_mapper = BatchedMapper(batch_size=128)
+        result_list = []
+        for results in tqdm(rxn_mapper.map_reactions_with_info(rxns_to_run), total=len(rxns_to_run)):
+            result_list.append(results.get('mapped_rxn'))
 
     rxn2aam = dict(zip(rxns_to_run, result_list))
     rxn2aam.update(cached_rxn2aam)

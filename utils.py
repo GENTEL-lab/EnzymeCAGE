@@ -21,10 +21,16 @@ def check_files(model_conf):
         assert os.path.exists(model_conf.rxn_fp)
     if hasattr(model_conf, "protein_gvp_feat"):
         assert os.path.exists(model_conf.protein_gvp_feat)
+    if hasattr(model_conf, "protein_gvp_feat_extra"):
+        assert os.path.exists(model_conf.protein_gvp_feat_extra)
     if hasattr(model_conf, "esm_mean_feature"):
         assert os.path.exists(model_conf.esm_mean_feature)
+    if hasattr(model_conf, "esm_mean_feature_extra"):
+        assert os.path.exists(model_conf.esm_mean_feature_extra)
     if hasattr(model_conf, "esm_node_feature"):
         assert os.path.exists(model_conf.esm_node_feature)
+    if hasattr(model_conf, "esm_node_feature_extra"):
+        assert os.path.exists(model_conf.esm_node_feature_extra)
     if hasattr(model_conf, "mol_conformation"):
         assert os.path.exists(model_conf.mol_conformation)
     if hasattr(model_conf, "reaction_center"):

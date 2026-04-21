@@ -2,7 +2,18 @@ import torch, functools
 from torch import nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
-from torch_scatter import scatter_add
+
+try:
+    from torch_scatter import scatter_add
+except Exception:
+    def scatter_add(src, index, dim=-1, out=None, dim_size=None):
+        if out is None:
+            out_shape = list(src.shape)
+            if dim_size is None:
+                dim_size = int(index.max()) + 1 if index.numel() > 0 else 0
+            out_shape[dim] = dim_size
+            out = torch.zeros(out_shape, dtype=src.dtype, device=src.device)
+        return out.index_add_(dim, index, src)
 
 def tuple_sum(*args):
     '''

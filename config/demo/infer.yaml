@@ -1,22 +1,22 @@
-model: 'EnzymeCAGE'
-interaction_method: 'geo-enhanced-interaction'
+model: EnzymeCAGE
+interaction_method: geo-enhanced-interaction
 rxn_inner_interaction: True
 pocket_inner_interaction: True
 use_prods_info: False
 use_structure: True
 use_drfp: True
 use_esm: True
-batch_size: 16
-predict_mode: 'only_best'
+esm_model: ESM-C_600M
+batch_size: 64
+model_list: ['best_model.pth']
 
-data_path: dataset/toy-data/test.csv
-ckpt_dir: checkpoints/unseen-enzymes/seed_42/
+data_path: dataset/demo/mining.csv
+ckpt_dir: checkpoints/pretrain/seed_42
+result_dir: dataset/demo/predictions
 
-
-# feature
-rxn_fp: dataset/toy-data/feature/reaction/drfp/rxn2fp.pkl
-protein_gvp_feat: dataset/toy-data/feature/protein/gvp_feature/gvp_protein_feature.pt
-esm_mean_feature: dataset/toy-data/feature/protein/esm2_t33_650M_UR50D/protein_level/seq2feature.pkl
-esm_node_feature: dataset/toy-data/feature/protein/esm2_t33_650M_UR50D/pocket_node_feature/esm_node_feature.pt
-mol_conformation: dataset/feature/reaction/molecule_conformation
-reaction_center: dataset/toy-data/feature/reaction/reacting_center/reacting_center.pkl
+rxn_fp: dataset/demo/feature/reaction/drfp/rxn2fp.pkl
+mol_conformation: dataset/demo/feature/reaction/molecule_conformation
+reaction_center: dataset/demo/feature/reaction/reacting_center/reacting_center.pkl
+protein_gvp_feat: dataset/demo/feature/protein/gvp_feature/gvp_protein_feature.pt
+esm_mean_feature: dataset/demo/feature/protein/ESM-C_600M/protein_level/seq2feature.pkl
+esm_node_feature: dataset/demo/feature/protein/ESM-C_600M/pocket_node_feature/esm_node_feature.pt

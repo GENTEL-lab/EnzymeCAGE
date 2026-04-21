@@ -1,5 +1,6 @@
 import os
 import argparse
+import json
 
 import pandas as pd
 import numpy as np
@@ -141,41 +142,64 @@ def cal_all_ef(df_score, label_col='Label', score_col='pred', topk=None, top_per
     return ef_list
 
 
+def evaluate_result(result_path, pos_pair_db_path=None, pred_col='pred'):
+    if not pos_pair_db_path:
+        pos_pair_db_path = result_path
+
+    assert os.path.exists(result_path), f'result path not exists: {result_path}'
+    assert os.path.exists(pos_pair_db_path), f'positive pair db path not exists: {pos_pair_db_path}'
+    df_pred = pd.read_csv(result_path)
+    df_pred = filter_duplicates(df_pred)
+    df_pos_pairs = pd.read_csv(pos_pair_db_path)
+
+    _, rxn_to_uid = init_mapping_info(df_pos_pairs)
+
+    rxn_col = 'CANO_RXN_SMILES' if 'CANO_RXN_SMILES' in df_pred.columns else 'reaction'
+    test_rxns = df_pred[rxn_col].unique()
+    dcg_list = calc_all_dcg(df_pred, k=10)
+    ef1_list = cal_all_ef(df_pred, top_percent=0.01)
+    ef2_list = cal_all_ef(df_pred, top_percent=0.02)
+    sr_dict = eval_top_rank_result(df_pred, test_rxns, true_enz_dict=rxn_to_uid, to_print=False, pred_col=pred_col)
+
+    return {
+        'top10_dcg': float(np.mean(dcg_list)),
+        'top1_percent_ef': float(np.mean(ef1_list)),
+        'top2_percent_ef': float(np.mean(ef2_list)),
+        'top1_sr': float(sr_dict['top1']),
+        'top3_sr': float(sr_dict['top3']),
+        'top5_sr': float(sr_dict['top5']),
+        'top10_sr': float(sr_dict['top10']),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--result_path', type=str, required=True)
     parser.add_argument('--pos_pair_db_path', type=str, default=None)
     parser.add_argument('--pred_col', type=str, default='pred')
+    parser.add_argument('--json_path', type=str, default=None)
     args = parser.parse_args()
-    
-    if not args.pos_pair_db_path:
-        args.pos_pair_db_path = args.result_path
-        
-    assert os.path.exists(args.result_path), f'result path not exists: {args.result_path}'
-    assert os.path.exists(args.pos_pair_db_path), f'positive pair db path not exists: {args.pos_pair_db_path}'
-    df_pred = pd.read_csv(args.result_path)
-    df_pred = filter_duplicates(df_pred)
-    df_pos_pairs = pd.read_csv(args.pos_pair_db_path)
-    
-    _, rxn_to_uid = init_mapping_info(df_pos_pairs)
-    
-    test_rxns = df_pred['CANO_RXN_SMILES'].unique()
-    dcg_list = calc_all_dcg(df_pred, k=10)
-    ef1_list = cal_all_ef(df_pred, top_percent=0.01)
-    ef2_list = cal_all_ef(df_pred, top_percent=0.02)
-    dcg, ef1, ef2 = np.mean(dcg_list), np.mean(ef1_list), np.mean(ef2_list)
-    
-    sr_dict = eval_top_rank_result(df_pred, test_rxns, true_enz_dict=rxn_to_uid, to_print=False, pred_col=args.pred_col)
-    
+
+    metric_dict = evaluate_result(
+        result_path=args.result_path,
+        pos_pair_db_path=args.pos_pair_db_path,
+        pred_col=args.pred_col,
+    )
+
     print('\n########### Evaluation Results ###########')
-    print(f'Top-10 DCG: {dcg:.4f}')
-    print(f'Top-1% EF : {ef1:.4f}')
-    print(f'Top-2% EF : {ef2:.4f}')
-    print(f'Top-1  SR : {sr_dict["top1"]*100:.2f}%')
-    print(f'Top-3  SR : {sr_dict["top3"]*100:.2f}%')
-    print(f'Top-5  SR : {sr_dict["top5"]*100:.2f}%')
-    print(f'Top-10 SR : {sr_dict["top10"]*100:.2f}%')
+    print(f'Top-10 DCG: {metric_dict["top10_dcg"]:.4f}')
+    print(f'Top-1% EF : {metric_dict["top1_percent_ef"]:.4f}')
+    print(f'Top-2% EF : {metric_dict["top2_percent_ef"]:.4f}')
+    print(f'Top-1  SR : {metric_dict["top1_sr"]*100:.2f}%')
+    print(f'Top-3  SR : {metric_dict["top3_sr"]*100:.2f}%')
+    print(f'Top-5  SR : {metric_dict["top5_sr"]*100:.2f}%')
+    print(f'Top-10 SR : {metric_dict["top10_sr"]*100:.2f}%')
     print('###########################################\n')
+
+    if args.json_path:
+        with open(args.json_path, 'w', encoding='utf-8') as f:
+            json.dump(metric_dict, f, indent=2)
+        print(f'Save evaluation result to: {args.json_path}')
 
 
 if __name__ == '__main__':

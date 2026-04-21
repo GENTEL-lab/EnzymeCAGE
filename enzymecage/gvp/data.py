@@ -5,7 +5,11 @@ import torch, math
 import torch.utils.data as data
 import torch.nn.functional as F
 import torch_geometric
-import torch_cluster
+
+try:
+    import torch_cluster
+except Exception:
+    torch_cluster = None
 
 def _normalize(tensor, dim=-1):
     '''
@@ -30,6 +34,27 @@ def _rbf(D, D_min=0., D_max=20., D_count=16, device='cpu'):
 
     RBF = torch.exp(-((D_expand - D_mu) / D_sigma) ** 2)
     return RBF
+
+
+def _knn_graph_fallback(x, k):
+    num_nodes = x.size(0)
+    if num_nodes <= 1:
+        return torch.empty((2, 0), dtype=torch.long, device=x.device)
+
+    k = min(k, num_nodes - 1)
+    distances = torch.cdist(x, x)
+    distances.fill_diagonal_(float('inf'))
+    knn_indices = torch.topk(distances, k=k, dim=-1, largest=False).indices
+
+    targets = torch.arange(num_nodes, device=x.device).unsqueeze(1).expand(-1, k).reshape(-1)
+    sources = knn_indices.reshape(-1)
+    return torch.stack([sources, targets], dim=0)
+
+
+def _build_knn_graph(x, k):
+    if torch_cluster is not None:
+        return torch_cluster.knn_graph(x, k=k)
+    return _knn_graph_fallback(x, k)
 
 
 class CATHDataset:
@@ -171,7 +196,7 @@ class ProteinGraphDataset(data.Dataset):
             coords[~mask] = np.inf
             
             X_ca = coords[:, 1]
-            edge_index = torch_cluster.knn_graph(X_ca, k=self.top_k)
+            edge_index = _build_knn_graph(X_ca, k=self.top_k)
             
             pos_embeddings = self._positional_embeddings(edge_index)
             E_vectors = X_ca[edge_index[0]] - X_ca[edge_index[1]]

@@ -11,20 +11,33 @@ CNT_FAILED = 0
 failed_uids = []
 
 
+def get_cif_url(uid):
+    """Query the AlphaFold API to get the current CIF download URL."""
+    api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{uid}"
+    response = requests.get(api_url, timeout=30)
+    if response.status_code == 200:
+        data = response.json()
+        if data and "cifUrl" in data[0]:
+            return data[0]["cifUrl"]
+    return None
+
+
 def download_alphafold_structure(uid, save_dir):
     output_file = os.path.join(save_dir, f"{uid}.cif")
-    # output_file = f"/home/liuy/data/SynBio/Terpene/structures/af2/{uid}.pdb"
 
     if os.path.exists(output_file):
-        return
+        return True
 
     try:
-        url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.cif"
-        response = requests.get(url)
+        cif_url = get_cif_url(uid)
+        if cif_url is None:
+            # Fallback to current known version
+            cif_url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.cif"
+
+        response = requests.get(cif_url, timeout=60)
         if response.status_code == 200:
             with open(output_file, 'wb') as file:
                 file.write(response.content)
-            # print(f"Structure for {uniprot_id} downloaded successfully.")
             return True
         else:
             print(f"No structure found for {uid}.")
@@ -32,14 +45,15 @@ def download_alphafold_structure(uid, save_dir):
             CNT_FAILED += 1
             failed_uids.append(uid)
             return False
-    except:
+    except Exception as e:
+        print(f"Error downloading {uid}: {e}")
         return False
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, required=True)
-    parser.add_argument('--uid_col', type=str, default='uniprotID', help='The column name of Uniprot ID in the data file')
+    parser.add_argument('--uid_col', type=str, default='UniprotID', help='The column name of Uniprot ID in the data file')
     parser.add_argument('--n_process', type=int, default=10)
     args = parser.parse_args()
     
@@ -49,7 +63,14 @@ def main():
     
     df_data = pd.read_csv(args.data_path)
     if args.uid_col not in df_data.columns:
-        raise ValueError(f"Column {args.uid_col} does not exist in the data file.")
+        lower_to_col = {col.lower(): col for col in df_data.columns}
+        matched_col = lower_to_col.get(args.uid_col.lower())
+        if matched_col:
+            args.uid_col = matched_col
+        elif 'uniprotid' in lower_to_col:
+            args.uid_col = lower_to_col['uniprotid']
+        else:
+            raise ValueError(f"Column {args.uid_col} does not exist in the data file.")
     
     uniprot_ids = set(df_data[args.uid_col])
     uids_to_download = [each for each in uniprot_ids if isinstance(each, str)]
