@@ -19,7 +19,7 @@ pip install torch==2.4.0 torch-scatter torch-cluster torch-sparse torch-geometri
 ```
 
 ## Dataset
-Please download the full dataset [here](https://drive.google.com/file/d/1IcuoqpEGhKdLAG9zorKEHQ9RDXSgU3_C/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
+Please download the full dataset [here](https://drive.google.com/file/d/1MKNlF5DbaETJcWjVdXy3dh2sgGTHpmpM/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
 
 Place the downloaded `dataset.zip` and `checkpoints.zip` in the current folder, then unzip them. Next, calculate the protein feature (it is recommended to directly use the reaction feature provided in the data).
 
