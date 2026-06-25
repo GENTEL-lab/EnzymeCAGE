@@ -93,6 +93,8 @@ This workflow is intended for enzyme mining from a reaction, or reaction mining 
 
 The repository includes a minimal demo in `dataset/demo`, which contains one reaction and five candidate enzyme structures.
 
+Before running the demo pipeline, please download the pre-trained model checkpoints from [Google Drive](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing), place `checkpoints.zip` in the repository root, and unzip it so that `checkpoints/pretrain/seed_42/best_model.pth` is available.
+
 ### 1. Install P2Rank
 Running Alphafill can be relatively complicated; you can use P2Rank as an alternative to extract enzyme pockets. Here are the steps to install P2Rank:
 
