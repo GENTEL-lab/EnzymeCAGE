@@ -8,7 +8,7 @@ use_drfp: True
 use_esm: True
 esm_model: ESM-C_600M
 batch_size: 64
-model_list: ['best_model.pth']
+model_list: ['epoch_19.pth']
 
 data_path: dataset/demo/mining.csv
 ckpt_dir: checkpoints/pretrain/seed_42
