@@ -189,7 +189,6 @@ bash shells/run_demo_mining.sh
 No commercial use of the model or data; see LICENSE for details.
 
 ## Citation
-Please cite the following preprint when referencing EnzymeCAGE:
 ```
 @article{liu2026geometric,
   title={A geometric foundation model for enzyme retrieval with evolutionary insights},
