@@ -1,5 +1,10 @@
 # EnzymeCAGE: A Geometric Foundation Model for Enzyme Retrieval with Evolutionary Insights
 
+<p align="center">
+  <a href="https://huggingface.co/GENTEL-Lab/EnzymeCAGE">🤗 Model checkpoints</a> ·
+  <a href="https://drive.google.com/file/d/1MKNlF5DbaETJcWjVdXy3dh2sgGTHpmpM/view?usp=sharing">📦 Dataset (Google Drive)</a>
+</p>
+
 ![EnzymeCAGE](./image/EnzymeCAGE.jpg)
 
 ## Environment 
@@ -19,9 +24,18 @@ pip install torch==2.4.0 torch-scatter torch-cluster torch-sparse torch-geometri
 ```
 
 ## Dataset
-Please download the full dataset [here](https://drive.google.com/file/d/1MKNlF5DbaETJcWjVdXy3dh2sgGTHpmpM/view?usp=sharing), and pre-trained model checkpoints [here](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing)
+Download the full dataset from [Google Drive](https://drive.google.com/file/d/1MKNlF5DbaETJcWjVdXy3dh2sgGTHpmpM/view?usp=sharing), place `dataset.zip` in the repository root, and unzip it. The dataset is not hosted on Hugging Face.
 
-Place the downloaded `dataset.zip` and `checkpoints.zip` in the current folder, then unzip them. Next, calculate the protein feature (it is recommended to directly use the reaction feature provided in the data).
+Download the pre-trained seed 42 checkpoint from [Hugging Face](https://huggingface.co/GENTEL-Lab/EnzymeCAGE) into the path expected by the demo and evaluation configs:
+
+```shell
+pip install -U huggingface_hub
+hf download GENTEL-Lab/EnzymeCAGE pretrain/seed_42/epoch_19.pth --local-dir checkpoints
+```
+
+The Hugging Face repository also contains `epoch_19.pth` for seeds 40–44. To download all five, run `hf download GENTEL-Lab/EnzymeCAGE --include "pretrain/*/epoch_19.pth" --local-dir checkpoints`. The original [checkpoints.zip on Google Drive](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing) remains available as an alternative; unzip it in the repository root.
+
+Next, calculate the protein feature (it is recommended to directly use the reaction feature provided in the data).
 
 ```shell
 cd feature
@@ -93,7 +107,7 @@ This workflow is intended for enzyme mining from a reaction, or reaction mining 
 
 The repository includes a minimal demo in `dataset/demo`, which contains one reaction and five candidate enzyme structures.
 
-Before running the demo pipeline, please download the pre-trained model checkpoints from [Google Drive](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing), place `checkpoints.zip` in the repository root, and unzip it so that `checkpoints/pretrain/seed_42/epoch_19.pth` is available. The downloaded pre-training checkpoint is named `epoch_19.pth`, not `best_model.pth`.
+Before running the demo pipeline, make sure `checkpoints/pretrain/seed_42/epoch_19.pth` is available. Download it from Hugging Face using the command above, or unzip the original Google Drive archive in the repository root. The pre-trained checkpoint is named `epoch_19.pth`, not `best_model.pth`.
 
 ### 1. Install P2Rank
 Running Alphafill can be relatively complicated; you can use P2Rank as an alternative to extract enzyme pockets. Here are the steps to install P2Rank:
