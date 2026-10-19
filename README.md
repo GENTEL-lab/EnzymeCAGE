@@ -93,7 +93,7 @@ This workflow is intended for enzyme mining from a reaction, or reaction mining 
 
 The repository includes a minimal demo in `dataset/demo`, which contains one reaction and five candidate enzyme structures.
 
-Before running the demo pipeline, please download the pre-trained model checkpoints from [Google Drive](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing), place `checkpoints.zip` in the repository root, and unzip it so that `checkpoints/pretrain/seed_42/best_model.pth` is available.
+Before running the demo pipeline, please download the pre-trained model checkpoints from [Google Drive](https://drive.google.com/file/d/1LLsS_MMKEbFpU2iIOF9ro46cO86S-SCt/view?usp=sharing), place `checkpoints.zip` in the repository root, and unzip it so that `checkpoints/pretrain/seed_42/epoch_19.pth` is available. The downloaded pre-training checkpoint is named `epoch_19.pth`, not `best_model.pth`.
 
 ### 1. Install P2Rank
 Running Alphafill can be relatively complicated; you can use P2Rank as an alternative to extract enzyme pockets. Here are the steps to install P2Rank:
@@ -164,7 +164,7 @@ If you rerun only the pocket step and want to reuse the reaction features, add `
 python infer.py --config config/demo/infer.yaml
 ```
 
-The demo config uses `checkpoints/pretrain/seed_42/best_model.pth` and writes predictions to `dataset/demo/predictions/`.
+The demo config uses `checkpoints/pretrain/seed_42/epoch_19.pth` and writes predictions to `dataset/demo/predictions/`.
 
 ### One-command demo pipeline
 The whole demo can also be run by:
@@ -174,10 +174,10 @@ python scripts/run_mining_pipeline.py \
   --data_dir dataset/demo \
   --p2rank_home tools/p2rank_2.5.1 \
   --checkpoint_dir checkpoints/pretrain/seed_42 \
-  --model_name best_model.pth
+  --model_name epoch_19.pth
 ```
 
-This command creates the pair CSV, runs P2Rank, generates features, runs inference, and writes a ranked result table to `dataset/demo/predictions/mining_best_model_ranked.csv`.
+This command creates the pair CSV, runs P2Rank, generates features, runs inference, and writes a ranked result table to `dataset/demo/predictions/mining_epoch_19_ranked.csv`.
 
 For the bundled demo, there is also a shell wrapper:
 

@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DATA_DIR="${DATA_DIR:-dataset/demo}"
 P2RANK_HOME="${P2RANK_HOME:-tools/p2rank_2.5.1}"
-CHECKPOINT_DIR="${CHECKPOINT_DIR:-checkpoints/full/seed_42}"
-MODEL_NAME="${MODEL_NAME:-best_model.pth}"
+CHECKPOINT_DIR="${CHECKPOINT_DIR:-checkpoints/pretrain/seed_42}"
+MODEL_NAME="${MODEL_NAME:-epoch_19.pth}"
 THREADS="${THREADS:-4}"
 ENV_NAME="${ENV_NAME:-enzymecage}"
 
